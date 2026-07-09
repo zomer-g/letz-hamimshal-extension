@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>לץ הממשל — מסגור צילומי מסך ל-CWS (1280×800)</title>
+<style>
+  :root{ --teal:#044E66; --teal-d:#033748; --teal-l:#06607C; }
+  *{ box-sizing:border-box; }
+  body{ font-family:'Segoe UI',Arial,sans-serif; margin:0; background:#eef2f3; color:#0f2530; }
+  header{ background:linear-gradient(180deg,#06607C,#033748); color:#fff; padding:18px 28px; }
+  header h1{ margin:0; font-size:22px; font-weight:700; }
+  header p{ margin:6px 0 0; font-size:14px; opacity:.9; }
+  main{ max-width:1100px; margin:0 auto; padding:24px; }
+  #drop{ border:2px dashed #9bbcc7; border-radius:14px; background:#fff; padding:40px; text-align:center; color:#436; cursor:pointer; transition:.15s; }
+  #drop.hot{ border-color:var(--teal); background:#e8f5f9; }
+  #drop b{ color:var(--teal); }
+  .bar{ display:flex; gap:12px; align-items:center; margin:18px 0; flex-wrap:wrap; }
+  button{ font-family:inherit; font-size:14px; font-weight:600; border:none; border-radius:8px; padding:9px 16px; cursor:pointer; }
+  .primary{ background:var(--teal); color:#fff; } .primary:hover{ background:var(--teal-d); }
+  .ghost{ background:#fff; color:var(--teal); border:1px solid #cfe0e6; }
+  .card{ background:#fff; border:1px solid #e2e8ea; border-radius:14px; padding:16px; margin:16px 0; }
+  .card h3{ margin:0 0 10px; font-size:15px; }
+  .row{ display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+  canvas.preview{ width:480px; height:300px; border:1px solid #dce4e6; border-radius:8px; background:#fff; }
+  .fields{ flex:1; min-width:260px; }
+  label{ display:block; font-size:13px; color:#557; margin:10px 0 4px; }
+  input,select{ width:100%; font-family:inherit; font-size:14px; padding:8px 10px; border:1px solid #cfd9dc; border-radius:8px; }
+  .muted{ color:#6a808a; font-size:13px; line-height:1.6; }
+</style>
+</head>
+<body>
+<header>
+  <h1>לץ הממשל — מסגור צילומי מסך ל-Chrome Web Store</h1>
+  <p>גוררים את צילומי המסך לכאן → מקבלים promos ממותגים בדיוק 1280×800 (PNG), מוכנים להעלאה.</p>
+</header>
+<main>
+  <div id="drop">גררו לכאן את צילומי המסך, או <b>לחצו לבחירה</b><input id="file" type="file" accept="image/*" multiple hidden></div>
+  <div class="bar">
+    <button class="primary" id="dlAll">⬇ הורד הכל</button>
+    <span class="muted" id="status">לא נטענו צילומים עדיין.</span>
+  </div>
+  <div id="cards"></div>
+  <p class="muted">טיפ: סדר ההורדה לפי סדר הגרירה. ניתן לערוך את הכותרת לכל צילום. הרקע, הלוגו והפס העליון זהים לזהות "לץ הממשל".</p>
+</main>
+
+<script>
+const W=1280, H=800, HEAD=156;
+const TEAL='#044E66', TEAL_D='#033748', TEAL_L='#06607C', GOLD='#F2B705';
+const PRESETS=[
+  'הורדת שכבות GIS כ-GeoJSON + CSV — ישירות מהמפה',
+  'כל שכבת GovMap כ-GeoJSON ו-CSV בלחיצה אחת',
+  'מסמכי תוכנית מאורגנים לפי קטגוריה',
+  'מאגרי נתונים ממשלתיים שלמים כ-CSV',
+  'היסטוריית עסקאות נדל״ן כ-CSV',
+  'מזהה ומוריד מאגרי מידע ממשלתיים — מקומי בדפדפן',
+];
+
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+<rect width="128" height="128" rx="28" fill="#044E66"/>
+<g transform="translate(24,14) scale(0.8)">
+<polygon points="50,16 14,100 23,100" fill="#0E8FA6"/><polygon points="50,16 23,100 32,100" fill="#F2B705"/><polygon points="50,16 32,100 41,100" fill="#F5F0E6"/><polygon points="50,16 41,100 50,100" fill="#0B5566"/><polygon points="50,16 50,100 59,100" fill="#0E8FA6"/><polygon points="50,16 59,100 68,100" fill="#F2B705"/><polygon points="50,16 68,100 77,100" fill="#F5F0E6"/><polygon points="50,16 77,100 86,100" fill="#0B5566"/>
+<g fill="#F2B705"><circle cx="14" cy="102" r="5"/><circle cx="23" cy="102" r="5"/><circle cx="32" cy="102" r="5"/><circle cx="41" cy="102" r="5"/><circle cx="50" cy="102" r="5"/><circle cx="59" cy="102" r="5"/><circle cx="68" cy="102" r="5"/><circle cx="77" cy="102" r="5"/><circle cx="86" cy="102" r="5"/></g>
+<circle cx="50" cy="16" r="11.5" fill="#F2B705"/><circle cx="46.5" cy="12.5" r="3" fill="#fff4cc" opacity=".85"/></g>
+<circle cx="100" cy="100" r="20" fill="#fff" stroke="#033748" stroke-width="1.5"/><rect x="95.5" y="87" width="9" height="15" rx="1.5" fill="#044E66"/><path d="M88 99 L112 99 L100 114 Z" fill="#044E66"/></svg>`;
+const logoImg = new Image();
+logoImg.src = 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(LOGO_SVG);
+
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+function render(canvas, img, caption){
+  const ctx=canvas.getContext('2d');
+  canvas.width=W; canvas.height=H;
+  // page background
+  ctx.fillStyle='#eef2f3'; ctx.fillRect(0,0,W,H);
+  // header band (teal gradient)
+  const g=ctx.createLinearGradient(0,0,0,HEAD); g.addColorStop(0,TEAL_L); g.addColorStop(1,TEAL_D);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,HEAD);
+  // logo (right, RTL)
+  const ls=104, lx=W-40-ls, ly=(HEAD-ls)/2;
+  if(logoImg.complete) ctx.drawImage(logoImg,lx,ly,ls,ls);
+  // title + caption (right-aligned, to the left of the logo)
+  ctx.textAlign='right'; ctx.direction='rtl';
+  ctx.fillStyle='#fff'; ctx.font='700 42px "Segoe UI",Arial';
+  ctx.fillText('לץ הממשל', lx-22, 70);
+  ctx.fillStyle='#dff1f6'; ctx.font='400 24px "Segoe UI",Arial';
+  ctx.fillText(caption||'', lx-22, 112);
+  // over.org.il tag (left)
+  ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='400 18px "Segoe UI",Arial';
+  ctx.fillText('over.org.il', 40, HEAD/2+6);
+  // screenshot card
+  const pad=40, ax=pad, ay=HEAD+pad, aw=W-pad*2, ah=H-HEAD-pad*2;
+  ctx.save(); roundRect(ctx,ax,ay,aw,ah,16); ctx.fillStyle='#fff'; ctx.fill();
+  ctx.strokeStyle='#d4dee1'; ctx.lineWidth=1; ctx.stroke(); ctx.clip();
+  // draw image "contain", centered, top-aligned
+  const s=Math.min(aw/img.width, ah/img.height);
+  const dw=img.width*s, dh=img.height*s;
+  const dx=ax+(aw-dw)/2, dy=ay; // top-align so the overlay (usually bottom-right) stays visible
+  ctx.drawImage(img,dx,dy,dw,dh);
+  ctx.restore();
+}
+
+let items=[];
+function addFiles(files){
+  for(const f of files){ if(!f.type.startsWith('image/')) continue;
+    const url=URL.createObjectURL(f);
+    const img=new Image();
+    img.onload=()=>{ items.push({img,caption:PRESETS[items.length%PRESETS.length]||''}); draw(); };
+    img.src=url;
+  }
+}
+function draw(){
+  const wrap=document.getElementById('cards'); wrap.innerHTML='';
+  document.getElementById('status').textContent = items.length? `${items.length} צילומים — מוכן להורדה (1280×800).` : 'לא נטענו צילומים עדיין.';
+  items.forEach((it,i)=>{
+    const card=document.createElement('div'); card.className='card';
+    card.innerHTML=`<h3>צילום ${i+1}</h3><div class="row"><canvas class="preview"></canvas>
+      <div class="fields"><label>כותרת</label><input value="${(it.caption||'').replace(/"/g,'&quot;')}">
+      <label>כותרות מוכנות</label><select><option value="">— בחר —</option>${PRESETS.map(p=>`<option>${p}</option>`).join('')}</select>
+      <div style="margin-top:14px"><button class="ghost dl">⬇ הורד את הצילום הזה</button></div></div></div>`;
+    wrap.appendChild(card);
+    const cv=card.querySelector('canvas');
+    const full=document.createElement('canvas');
+    const redraw=()=>{ render(full,it.img,it.caption); const c=cv.getContext('2d'); cv.width=480; cv.height=300; c.drawImage(full,0,0,480,300); };
+    if(logoImg.complete) redraw(); else logoImg.onload=()=>draw();
+    card.querySelector('input').addEventListener('input',e=>{it.caption=e.target.value; redraw();});
+    card.querySelector('select').addEventListener('change',e=>{ if(e.target.value){ it.caption=e.target.value; card.querySelector('input').value=e.target.value; redraw(); }});
+    card.querySelector('.dl').addEventListener('click',()=>download(full,i));
+  });
+}
+function download(full,i){ full.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=`promo-${String(i+1).padStart(2,'0')}.jpg`; a.click(); },'image/jpeg',0.95); }
+document.getElementById('dlAll').addEventListener('click',()=>{ items.forEach((it,i)=>{ const f=document.createElement('canvas'); render(f,it.img,it.caption); setTimeout(()=>download(f,i), i*350); }); });
+
+const drop=document.getElementById('drop'), file=document.getElementById('file');
+drop.addEventListener('click',()=>file.click());
+file.addEventListener('change',e=>addFiles(e.target.files));
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('hot');});
+drop.addEventListener('dragleave',()=>drop.classList.remove('hot'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('hot');addFiles(e.dataTransfer.files);});
+</script>
+</body>
+</html>

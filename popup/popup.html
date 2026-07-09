@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>לץ הממשל</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>לץ הממשל <span id="version" class="version"></span></h1>
+    <p class="tag">הורדת מאגרי מידע ממשלתיים פתוחים בלחיצה אחת</p>
+  </header>
+
+  <!-- "days since Government Decision 1933" counter (opt-in, off by default). -->
+  <a id="counter1933" class="counter-banner" href="#" target="_blank" rel="noreferrer" hidden>
+    <span class="counter-num" id="counterNum">—</span>
+    <span class="counter-text">ימים מאז שהממשלה החליטה שמאגרי המידע של המדינה ייפתחו לציבור ויהיו נגישים<span class="counter-link">רציונל ↗</span></span>
+  </a>
+
+  <!-- Current page: download straight from here, no floating window needed. -->
+  <section id="pageCard" class="page-card">
+    <div class="pc-status" id="pcStatus">בודק את הדף הנוכחי…</div>
+  </section>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="settings">הגדרות</button>
+    <button class="tab" data-tab="downloads">הורדות</button>
+    <button class="tab" data-tab="mavat">מנהל התכנון</button>
+    <button class="tab" data-tab="rationale">רציונל</button>
+  </nav>
+
+  <div class="panel" id="panel-downloads" hidden>
+    <h2>הורדות אחרונות</h2>
+    <ul id="history" class="history"></ul>
+    <button id="clearHistory" class="ghost">נקה היסטוריה</button>
+  </div>
+
+  <div class="panel" id="panel-mavat" hidden>
+    <h2>מידע תכנוני (מנהל התכנון)</h2>
+    <p class="tag" style="margin-bottom:8px">קטגוריות ברירת מחדל להורדה מתוכנית ב-mavat.iplan.gov.il:</p>
+    <div id="mavatCats"></div>
+  </div>
+
+  <div class="panel" id="panel-settings">
+    <h2>החלון הצף</h2>
+    <label class="row">
+      <input type="checkbox" id="overlayEnabled">
+      <span>הצג את החלון הצף אוטומטית באתרים נתמכים</span>
+    </label>
+    <p class="tag" style="margin:10px 0 6px">מיקום החלון על המסך:</p>
+    <div class="pos-grid" id="posGrid">
+      <button data-pos="top-left" title="למעלה משמאל">↖</button>
+      <button data-pos="top-right" title="למעלה מימין">↗</button>
+      <button data-pos="bottom-left" title="למטה משמאל">↙</button>
+      <button data-pos="bottom-right" title="למטה מימין">↘</button>
+    </div>
+    <button id="clearHideToday" class="ghost">הצג שוב את החלון היום</button>
+
+    <h2>אתרים נתמכים</h2>
+    <p class="tag" style="margin-bottom:6px">בטל סימון כדי להשבית את התוסף באתר מסוים (למשל להפעיל רק ב-GovMap):</p>
+    <div id="sitesList"></div>
+
+    <h2>עיריית ירושלים — רישוי בנייה</h2>
+    <p class="tag" style="margin-bottom:6px">קטגוריות מסומנות כברירת מחדל בהורדת תיק (מסמכים + טבלאות נתונים):</p>
+    <div id="jlmCats"></div>
+
+    <h2>כללי</h2>
+    <label class="row">
+      <input type="checkbox" id="jesterHat">
+      <span>שים כובע ליצן על הלוגו של האתר 🃏 (למראה קליל)</span>
+    </label>
+    <label class="row">
+      <input type="checkbox" id="counterToggle">
+      <span>הצג קאונטר: ימים מאז החלטת הממשלה לפתוח את מאגרי המידע של המדינה לציבור</span>
+    </label>
+    <label class="row">
+      <input type="checkbox" id="overOrgFallback">
+      <span>אפשר fallback ל-over.org.il עבור מקרים שלא ניתן לגרד בדפדפן</span>
+    </label>
+  </div>
+
+  <div class="panel" id="panel-rationale" hidden>
+    <div class="r-hero">
+      <span class="r-title">פתוח כברירת מחדל</span>
+      ב-30.8.2016 קיבלה ממשלת ישראל את <a href="https://www.gov.il/he/pages/2016_dec1933" target="_blank" rel="noreferrer">החלטה 1933</a>:
+      מאגרי המידע שבידי המדינה הם משאב ציבורי, ולכן פתיחתם היא הכלל ואי-פתיחתם היא החריג.
+      סעיף 12 חייב את כל המשרדים להנגיש עד שנת 2022 את <b>כלל</b> מאגריהם -
+      בפורמט פתוח, עם API, מטה-דאטה ותיעוד (נספח ג') - ולנמק כל מאגר שלא הונגש.
+    </div>
+
+    <p class="r-text">
+      המועד חלף. מבקר המדינה (2021) מצא שכשני שלישים מהמשרדים לא עמדו בהחלטה,
+      ובשטח - חלק עצום מהמאגרים הפומביים, שאין כל מניעה חוקית להנגישם, אינו נגיש כלל:
+      כלוא במערכות שאילתה סגורות, בלי קובץ, בלי API, בלי היסטוריה.
+    </p>
+
+    <p class="r-text">
+      <b>לץ הממשל</b> מקיים את חובת הפורמט הפתוח - הופך מאגרים כלואים לקובצי CSV / GeoJSON
+      בלחיצה אחת, בדפדפן שלך. <b>גרסאות לעם</b> מקיים את חובות השימור, העדכניות והתיעוד -
+      שומר כל גרסה היסטורית ומנגיש הכול מחדש, כולל API ותיעוד.
+      בכל מאגר שהתוסף מחלץ, ובכל גרסה שנשמרת - מיושם עוד סעיף מהחלטה 1933.
+      זה הרציונל כולו.
+    </p>
+
+    <a class="r-more" href="https://over.org.il/rationale" target="_blank" rel="noreferrer">
+      לרציונל המלא - ההבטחה, הסטנדרט, החריגים ומה שקרה בעשור שחלף ↗
+    </a>
+  </div>
+
+  <footer>
+    <a href="https://over.org.il" target="_blank" rel="noreferrer">גרסאות לעם</a>
+    <span aria-hidden="true"> · </span>
+    <a href="https://www.z-g.co.il/govscraper/privacy" target="_blank" rel="noreferrer">מדיניות פרטיות</a>
+    <span aria-hidden="true"> · </span>
+    <a href="https://www.z-g.co.il/govscraper/terms" target="_blank" rel="noreferrer">תנאי שימוש</a>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

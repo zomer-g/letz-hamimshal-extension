@@ -1,0 +1,32 @@
+{
+  "extName": {
+    "message": "לץ הממשל"
+  },
+  "extDescription": {
+    "message": "מזהה ומוריד מאגרי מידע ממשלתיים פתוחים — gov.il, נדל\"ן, GovMap, מנהל התכנון, צה\"ל, חצב ורישוי בנייה בירושלים. מקומי בדפדפן."
+  },
+  "overlayTitle": {
+    "message": "מאגר זוהה"
+  },
+  "downloadNow": {
+    "message": "הורד עכשיו"
+  },
+  "sendToServer": {
+    "message": "שלח לעיבוד חיצוני"
+  },
+  "hideToday": {
+    "message": "הסתר היום"
+  },
+  "close": {
+    "message": "סגור"
+  },
+  "scrapingProgress": {
+    "message": "נאספים נתונים…"
+  },
+  "scrapeComplete": {
+    "message": "ההורדה הושלמה"
+  },
+  "scrapeFailed": {
+    "message": "הגירוד נכשל"
+  }
+}

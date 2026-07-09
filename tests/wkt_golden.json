@@ -1,0 +1,50 @@
+{
+  "_comment": "CANONICAL shared golden fixture for cross-engine WKT parity. The Main scraper's coords.geom_to_wkt() (Python) and the extension's lib/wkt.js geomToWkt() (JS) MUST both serialise each `geom` to exactly its `wkt`. An identical copy lives at 'GOV scraper extension/tests/wkt_golden.json' so the extension test runs standalone; tests/test_wkt_parity.py guards that the two copies stay byte-identical. Coordinates are realistic ITM EPSG:6991 / lon-lat magnitudes; the strings are the JS-canonical shortest form (integral floats carry no trailing .0). If you change this file, change BOTH copies and re-run both tests.",
+  "cases": [
+    {
+      "name": "point",
+      "geom": { "type": "Point", "coordinates": [219529.584, 626907.39] },
+      "wkt": "POINT(219529.584 626907.39)"
+    },
+    {
+      "name": "point_integral_float",
+      "geom": { "type": "Point", "coordinates": [180100.0, 664000.0] },
+      "wkt": "POINT(180100 664000)"
+    },
+    {
+      "name": "point_integers",
+      "geom": { "type": "Point", "coordinates": [1, 2] },
+      "wkt": "POINT(1 2)"
+    },
+    {
+      "name": "multipoint",
+      "geom": { "type": "MultiPoint", "coordinates": [[1.5, 2.5], [3.0, 4.25]] },
+      "wkt": "MULTIPOINT((1.5 2.5), (3 4.25))"
+    },
+    {
+      "name": "linestring",
+      "geom": { "type": "LineString", "coordinates": [[178686.42, 663551.18], [222290.5, 631840.0]] },
+      "wkt": "LINESTRING(178686.42 663551.18, 222290.5 631840)"
+    },
+    {
+      "name": "multilinestring",
+      "geom": { "type": "MultiLineString", "coordinates": [[[1.5, 2.5], [3.0, 4.0]], [[5.25, 6.0], [7.0, 8.75]]] },
+      "wkt": "MULTILINESTRING((1.5 2.5, 3 4), (5.25 6, 7 8.75))"
+    },
+    {
+      "name": "polygon_with_hole",
+      "geom": { "type": "Polygon", "coordinates": [[[178000.1, 663000.2], [180000.3, 663000.4], [180000.5, 665000.6], [178000.1, 663000.2]], [[178500.0, 663500.5], [179000.25, 663500.5], [178500.0, 664000.75], [178500.0, 663500.5]]] },
+      "wkt": "POLYGON((178000.1 663000.2, 180000.3 663000.4, 180000.5 665000.6, 178000.1 663000.2), (178500 663500.5, 179000.25 663500.5, 178500 664000.75, 178500 663500.5))"
+    },
+    {
+      "name": "multipolygon",
+      "geom": { "type": "MultiPolygon", "coordinates": [[[[0.5, 0.5], [1.5, 0.5], [1.5, 1.5], [0.5, 0.5]]], [[[10.25, 10.25], [11.0, 10.0], [11.5, 11.5], [10.25, 10.25]]]] },
+      "wkt": "MULTIPOLYGON(((0.5 0.5, 1.5 0.5, 1.5 1.5, 0.5 0.5)), ((10.25 10.25, 11 10, 11.5 11.5, 10.25 10.25)))"
+    },
+    {
+      "name": "empty",
+      "geom": {},
+      "wkt": ""
+    }
+  ]
+}

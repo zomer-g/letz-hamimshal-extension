@@ -1,0 +1,154 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extName__",
+  "version": "0.3.50",
+  "description": "__MSG_extDescription__",
+  "default_locale": "he",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "downloads",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "govil_origin_rewrite",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "host_permissions": [
+    "https://api.nadlan.gov.il/*",
+    "https://www.govmap.gov.il/*",
+    "https://openapi-gc.digital.gov.il/*",
+    "https://*.openapi.gov.il/*",
+    "https://www.idf.il/*",
+    "https://idf.il/*",
+    "https://mavat.iplan.gov.il/*",
+    "https://geo.mot.gov.il/*",
+    "https://data.gov.il/*",
+    "https://*.jerusalem.muni.il/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  },
+  "action": {
+    "default_title": "__MSG_extName__",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.nadlan.gov.il/*"
+      ],
+      "js": [
+        "content/inject.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://mavat.iplan.gov.il/*"
+      ],
+      "js": [
+        "content/mavat-inject.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://www.govmap.gov.il/*"
+      ],
+      "js": [
+        "content/govmap-inject.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://geo.mot.gov.il/*"
+      ],
+      "js": [
+        "content/mot-inject.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.gov.il/he/departments/dynamiccollectors/*",
+        "https://www.gov.il/he/Departments/DynamicCollectors/*",
+        "https://www.gov.il/he/collectors/*",
+        "https://www.gov.il/he/Collectors/*",
+        "https://www.gov.il/he/pages/*",
+        "https://www.gov.il/he/Pages/*",
+        "https://www.nadlan.gov.il/*",
+        "https://www.govmap.gov.il/*",
+        "https://www.idf.il/*",
+        "https://idf.il/*",
+        "https://mavat.iplan.gov.il/*",
+        "https://geo.mot.gov.il/*",
+        "https://ykpubdata.jerusalem.muni.il/*"
+      ],
+      "js": [
+        "content/browser-compat.js",
+        "content/detector.js",
+        "content/overlay.js",
+        "content/logo-hat.js"
+      ],
+      "css": [
+        "content/overlay.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "content/inject.js",
+        "scrapers/registry.js",
+        "scrapers/govil.js",
+        "scrapers/nadlan.js",
+        "scrapers/govmap.js",
+        "scrapers/idf.js",
+        "scrapers/mavat.js",
+        "scrapers/mot.js",
+        "scrapers/mot-geometry.js",
+        "scrapers/jlm.js",
+        "scrapers/_content-attachments.js",
+        "lib/csv.js",
+        "lib/zip.js",
+        "lib/wkt.js",
+        "lib/fetch-proxy.js",
+        "lib/over-org-client.js"
+      ],
+      "matches": [
+        "https://www.gov.il/*",
+        "https://www.nadlan.gov.il/*",
+        "https://www.govmap.gov.il/*",
+        "https://www.idf.il/*",
+        "https://idf.il/*",
+        "https://mavat.iplan.gov.il/*",
+        "https://geo.mot.gov.il/*",
+        "https://ykpubdata.jerusalem.muni.il/*"
+      ]
+    }
+  ]
+}

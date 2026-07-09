@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<style>
+  /* over.org.il design tokens */
+  :root {
+    --primary: #044E66;
+    --primary-dark: #003647;
+    --primary-50: #E8F5F9;
+    --primary-100: #CCEBF3;
+    --bg: #F6F6F6;
+    --surface: #ffffff;
+    --border: #E5E7EB;
+    --text: #111827;
+    --muted: #4B5563;
+    --success: #22c55e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 800px; overflow: hidden; }
+  body {
+    font-family: Rubik, Heebo, "Segoe UI", Arial, sans-serif;
+    direction: rtl;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, var(--primary-50), transparent 60%),
+      linear-gradient(135deg, #eef4f6 0%, var(--bg) 55%, #e7eef0 100%);
+    position: relative;
+  }
+
+  /* Top brand bar */
+  .brandbar {
+    position: absolute; top: 0; right: 0; left: 0; height: 64px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 40px;
+    color: var(--primary-dark);
+  }
+  .brandbar .logo {
+    width: 36px; height: 36px; border-radius: 9px; display: block;
+  }
+  .brandbar .name { font-weight: 700; font-size: 19px; }
+  .brandbar .by { color: var(--muted); font-size: 13px; margin-right: 2px; }
+
+  /* Caption */
+  .caption {
+    position: absolute; top: 120px; right: 64px; left: 64px;
+  }
+  .caption h1 {
+    font-size: 44px; line-height: 1.18; color: var(--primary-dark);
+    font-weight: 800; letter-spacing: -0.5px; max-width: 760px;
+  }
+  .caption p {
+    margin-top: 14px; font-size: 20px; color: var(--muted);
+    font-weight: 400; max-width: 680px; line-height: 1.5;
+  }
+  .caption .pillrow { margin-top: 22px; display: flex; gap: 10px; }
+  .caption .pill {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--primary); font-weight: 600; font-size: 14px;
+    padding: 7px 16px; border-radius: 9999px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+
+  /* The real overlay card (mirrors content/overlay.css) */
+  .gs-overlay {
+    position: absolute; bottom: 56px; left: 64px;
+    width: 420px;
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 18px 50px rgba(20,50,60,.20);
+    padding: 20px 22px 18px;
+    direction: rtl;
+  }
+  .gs-overlay .close {
+    position: absolute; top: 12px; left: 14px; color: var(--muted);
+    font-size: 22px; line-height: 1;
+  }
+  .gs-title { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; padding-left: 24px; }
+  .gs-tag {
+    background: var(--primary); color: #fff; font-size: 11px; font-weight: 700;
+    letter-spacing: .03em; padding: 4px 11px; border-radius: 9999px; white-space: nowrap;
+  }
+  .gs-title-text { font-weight: 700; font-size: 17px; color: var(--text); flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gs-ver { color: var(--muted); font-size: 11px; font-family: ui-monospace, Consolas, monospace; }
+  .gs-meta { color: var(--muted); font-size: 13px; margin-bottom: 14px; display: flex; gap: 8px; }
+  .gs-meta .sep { color: var(--border); }
+  .gs-buttons { display: flex; flex-wrap: wrap; gap: 9px; }
+  .gs-btn { border: 0; border-radius: 8px; font-size: 14px; font-weight: 600;
+    padding: 10px 18px; font-family: inherit; }
+  .gs-btn-primary { background: var(--primary); color: #fff; }
+  .gs-btn-deep { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+  .gs-btn-ghost { background: transparent; color: var(--muted); padding: 10px 12px; }
+
+  /* "done" success bar variant */
+  .gs-progress {
+    background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d;
+    border-radius: 6px; padding: 11px 13px; font-size: 13px; font-weight: 600;
+    margin: 4px 0 14px;
+  }
+  .gs-progress .bar { height: 6px; background: #bbf7d0; border-radius: 9999px; margin-bottom: 8px; overflow: hidden; }
+  .gs-progress .fill { height: 100%; width: 100%; background: var(--success); }
+
+  /* decorative file chip */
+  .filechip {
+    position: absolute; bottom: 250px; left: 110px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.12);
+    padding: 12px 16px; display: flex; align-items: center; gap: 11px;
+    transform: rotate(-3deg);
+  }
+  .filechip .ico { width: 30px; height: 38px; border-radius: 4px; background: linear-gradient(160deg,#1f8f5b,#157a4a); color:#fff; font-size:11px; font-weight:700; display:flex; align-items:flex-end; justify-content:center; padding-bottom:4px; }
+  .filechip .fn { font-size: 13px; color: var(--text); font-weight: 600; }
+  .filechip .fs { font-size: 11px; color: var(--muted); }
+
+  .footer {
+    position: absolute; bottom: 22px; right: 64px; color: var(--muted); font-size: 13px;
+  }
+</style>
+</head>
+<body>
+  <div class="brandbar">
+    <img class="logo" src="../icons/icon-128.png" alt="">
+    <div class="name">GovScraper</div>
+    <div class="by">· גרסאות לעם · over.org.il</div>
+  </div>
+
+  <div class="caption">
+    <h1 id="cap-h1"></h1>
+    <p id="cap-p"></p>
+    <div class="pillrow" id="cap-pills"></div>
+  </div>
+
+  <div class="filechip" id="filechip">
+    <div class="ico" id="file-ext">CSV</div>
+    <div>
+      <div class="fn" id="file-name">dataset.csv</div>
+      <div class="fs" id="file-size">807 שורות · UTF-8</div>
+    </div>
+  </div>
+
+  <div class="gs-overlay">
+    <div class="close">×</div>
+    <div class="gs-title">
+      <span class="gs-tag">מאגר זוהה</span>
+      <span class="gs-title-text" id="ov-title"></span>
+      <span class="gs-ver">v0.2.4</span>
+    </div>
+    <div class="gs-meta">
+      <span id="ov-src"></span>
+      <span class="sep">•</span>
+      <span id="ov-kind"></span>
+    </div>
+    <div class="gs-progress" id="ov-progress" style="display:none">
+      <div class="bar"><div class="fill"></div></div>
+      <span id="ov-progress-text">ההורדה הושלמה</span>
+    </div>
+    <div class="gs-buttons" id="ov-buttons"></div>
+  </div>
+
+  <div class="footer">תוסף קוד-פתוח · כל הגירוד מתבצע במחשב שלך · ללא שרת</div>
+
+<script>
+  const variants = {
+    govmap: {
+      h1: 'מפה ממשלתית → GeoJSON ו-CSV בלחיצה אחת',
+      p: 'גלוש לשכבת GovMap, וחלון צף יציע להוריד את כל ה-features — קואורדינטות, מאפיינים והכל — כקובץ מוכן ל-QGIS ולאקסל.',
+      pills: ['govmap.gov.il', 'GeoJSON + CSV', 'EPSG:6991'],
+      title: 'שכבת GovMap: גני ילדים',
+      src: 'מקור: govmap.gov.il', kind: 'סוג: שכבת WFS',
+      buttons: [['הורד GeoJSON + CSV','primary'],['הסתר היום','ghost']],
+      fileExt: 'GEO', fileName: 'govmap_גני_ילדים.zip', fileSize: '20,465 features',
+      progress: null,
+    },
+    govil: {
+      h1: 'כל מאגר פתוח ב-gov.il — הופך לטבלה מסודרת',
+      p: 'אוספי פרסומים, מכרזים, החלטות ודרושים — התוסף קורא את ה-API של הדף ובונה CSV נקי בעברית, ישירות לתיקיית ההורדות.',
+      pills: ['gov.il', 'CSV בעברית', 'ללא שרת'],
+      title: 'אוסף: פרסומים',
+      src: 'מקור: gov.il', kind: 'סוג: Collector',
+      buttons: [['הורד CSV','primary'],['+ קבצים מצורפים','deep']],
+      fileExt: 'CSV', fileName: 'govil_פרסומים.csv', fileSize: '807 שורות · UTF-8',
+      progress: 'ההורדה הושלמה — 807 שורות',
+    },
+    nadlan: {
+      h1: 'היסטוריית עסקאות נדל"ן — ישירות לקובץ',
+      p: 'דף שכונה, רחוב או גוש/חלקה — התוסף לוכד את כל העסקאות שהאתר טוען ומסדר אותן לטבלה אחת להשוואה וניתוח.',
+      pills: ['nadlan.gov.il', 'עסקאות מכירה', 'CSV'],
+      title: 'עסקאות בשכונה — צפון יפו',
+      src: 'מקור: nadlan.gov.il', kind: 'סוג: עסקאות נדל"ן',
+      buttons: [['הורד עסקאות (CSV)','primary'],['הסתר היום','ghost']],
+      fileExt: 'CSV', fileName: 'nadlan_צפון_יפו.csv', fileSize: '1,000 עסקאות',
+      progress: 'ההורדה הושלמה — 1,000 עסקאות',
+    },
+    idf: {
+      h1: 'מסמכי צה"ל — פקודות מטכ"ל והפרקליטות הצבאית',
+      p: 'מאתרי היחידות של idf.il — התוסף אוסף את כל קישורי ה-PDF/DOC מהדף ומדפי המשנה, ואורז אותם ב-ZIP אחד עם אינדקס CSV.',
+      pills: ['idf.il', 'PDF + DOC', 'ZIP'],
+      title: 'מסמכי IDF: אתר הפקודות',
+      src: 'מקור: idf.il', kind: 'סוג: מסמכי יחידה',
+      buttons: [['הורד רשימה (CSV)','primary'],['הורד את כל המסמכים','deep']],
+      fileExt: 'ZIP', fileName: 'idf_פקודות.zip', fileSize: '142 מסמכים',
+      progress: null,
+    },
+  };
+
+  const params = new URLSearchParams(location.search);
+  const v = variants[params.get('v') || 'govmap'];
+
+  document.getElementById('cap-h1').textContent = v.h1;
+  document.getElementById('cap-p').textContent = v.p;
+  const pills = document.getElementById('cap-pills');
+  v.pills.forEach(t => { const s=document.createElement('span'); s.className='pill'; s.textContent=t; pills.appendChild(s); });
+
+  document.getElementById('ov-title').textContent = v.title;
+  document.getElementById('ov-src').textContent = v.src;
+  document.getElementById('ov-kind').textContent = v.kind;
+
+  document.getElementById('file-ext').textContent = v.fileExt;
+  document.getElementById('file-name').textContent = v.fileName;
+  document.getElementById('file-size').textContent = v.fileSize;
+
+  const btns = document.getElementById('ov-buttons');
+  v.buttons.forEach(([label,cls]) => { const b=document.createElement('button'); b.className='gs-btn gs-btn-'+cls; b.textContent=label; btns.appendChild(b); });
+
+  if (v.progress) {
+    const pr = document.getElementById('ov-progress');
+    pr.style.display = '';
+    document.getElementById('ov-progress-text').textContent = v.progress;
+  }
+</script>
+</body>
+</html>

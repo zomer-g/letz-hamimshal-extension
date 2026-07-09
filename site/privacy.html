@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>GovScraper — מדיניות פרטיות</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 30px 20px 60px;
+      font-family: "Heebo", "Segoe UI", Tahoma, sans-serif;
+      color: #1f3a3d;
+      background: #fffaf2;
+      line-height: 1.6;
+    }
+    h1 { color: #226e70; margin-bottom: 6px; }
+    h2 { color: #2a8d8f; margin-top: 28px; font-size: 18px; }
+    .meta { color: #5b7374; margin-bottom: 22px; font-size: 13px; }
+    ul { padding-right: 22px; }
+    code { background: #eef5f3; padding: 1px 6px; border-radius: 4px; font-size: 0.95em; }
+    a { color: #2a8d8f; }
+  </style>
+</head>
+<body>
+  <h1>GovScraper — מדיניות פרטיות</h1>
+  <p class="meta">עודכן לאחרונה: 2026-06-09</p>
+
+  <h2>מה התוסף עושה</h2>
+  <p>GovScraper מזהה מתי הדף שאתה גולש בו ב-www.gov.il, www.nadlan.gov.il או www.govmap.gov.il כולל מאגר נתונים פתוח, ומציע להוריד אותו כקובץ CSV או ZIP — ישירות מהדפדפן שלך.</p>
+
+  <h2>אילו נתונים נאספים</h2>
+  <p><strong>שום נתון לא נאסף אצלנו.</strong> כל מה שהתוסף נוגע בו נשאר בדפדפן שלך.</p>
+  <ul>
+    <li><strong>שורות המאגר</strong> — נשלפות מ-API של gov.il, נבנות ל-CSV/ZIP ונשמרות בתיקיית ההורדות המקומית. הבייטים לא יוצאים מהמחשב.</li>
+    <li><strong>היסטוריית הורדות</strong> (50 פריטים אחרונים: כתובת, שם המאגר, מספר שורות, חותמת זמן) — נשמרת ב-<code>chrome.storage.local</code> רק להצגה ב-popup. לא מסונכרנת, לא מועלה.</li>
+    <li><strong>העדפות</strong> ("הסתר היום", "אפשר fallback ל-over.org.il") — נשמרות ב-<code>chrome.storage.local</code> על המכשיר שלך.</li>
+  </ul>
+
+  <h2>מה לא נאסף</h2>
+  <p>התוסף <em>לא</em> אוסף, מעביר, מוכר או משתף:</p>
+  <ul>
+    <li>היסטוריית גלישה מחוץ ל-3 ה-host-ים הנתמכים</li>
+    <li>תוכן דפים מכל אתר אחר</li>
+    <li>מידע מזהה אישית (שם, אימייל, טלפון, כתובת)</li>
+    <li>פרטי הזדהות מכל סוג</li>
+    <li>מידע פיננסי</li>
+    <li>נתוני מיקום מעבר למה שמופיע בשכבות GovMap ציבוריות שאתה בוחר לגרד</li>
+  </ul>
+
+  <h2>אפשרות חיצונית (opt-in)</h2>
+  <p>קיים flag אופציונלי בשם "שלח לעיבוד חיצוני" שכבוי כברירת מחדל. רק אם אתה מפעיל אותו במפורש ב-popup ולוחץ על הכפתור הייעודי ב-overlay, נשלחת <strong>רק כתובת הדף הנוכחי</strong> ל-<a href="https://over.org.il">over.org.il</a> לטיפול ב-pipeline הציבורי שלהם. אף נתון אחר לא נשלח.</p>
+  <p>אם לא תפעיל את ה-flag, התוסף לא יוצר אף בקשת רשת ליעד שאינו gov.il.</p>
+
+  <h2>צדדים שלישיים</h2>
+  <p>אין. אין אנליטיקה, אין דיווח שגיאות, אין טלמטריה מכל סוג.</p>
+
+  <h2>איך לנקות נתונים שמורים</h2>
+  <p>פתח את ה-popup של התוסף ולחץ "נקה היסטוריה". כדי למחוק את כל ההעדפות, הסר את התוסף ב-<code>chrome://extensions</code>.</p>
+
+  <h2>יצירת קשר</h2>
+  <p><a href="mailto:guy@z-g.co.il">guy@z-g.co.il</a></p>
+  <hr>
+  <p>
+    <a href="https://www.z-g.co.il/govscraper">עמוד התוסף</a> ·
+    <a href="https://www.z-g.co.il/govscraper/privacy">מדיניות פרטיות</a> ·
+    <a href="https://www.z-g.co.il/govscraper/terms">תנאי שימוש</a>
+  </p>
+</body>
+</html>

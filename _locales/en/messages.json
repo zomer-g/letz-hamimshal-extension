@@ -1,0 +1,32 @@
+{
+  "extName": {
+    "message": "לץ הממשל — Israeli Gov Data Downloader"
+  },
+  "extDescription": {
+    "message": "Detects & downloads Israeli gov open data — gov.il, Nadlan, GovMap, Mavat, IDF, geo.mot, Jerusalem licensing. In-browser."
+  },
+  "overlayTitle": {
+    "message": "Dataset detected"
+  },
+  "downloadNow": {
+    "message": "Download now"
+  },
+  "sendToServer": {
+    "message": "Send to external processor"
+  },
+  "hideToday": {
+    "message": "Hide today"
+  },
+  "close": {
+    "message": "Close"
+  },
+  "scrapingProgress": {
+    "message": "Collecting data…"
+  },
+  "scrapeComplete": {
+    "message": "Download complete"
+  },
+  "scrapeFailed": {
+    "message": "Scrape failed"
+  }
+}

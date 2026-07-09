@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "header": "Origin", "operation": "set", "value": "https://www.gov.il" },
+        { "header": "Referer", "operation": "set", "value": "https://www.gov.il/" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||openapi-gc.digital.gov.il/",
+      "resourceTypes": ["xmlhttprequest"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "header": "Origin", "operation": "set", "value": "https://www.gov.il" },
+        { "header": "Referer", "operation": "set", "value": "https://www.gov.il/" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||openapi.gov.il/",
+      "resourceTypes": ["xmlhttprequest"]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "header": "Referer", "operation": "set", "value": "https://ykpubdata.jerusalem.muni.il/" },
+        { "header": "Origin", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||jerarchivews.jerusalem.muni.il/",
+      "resourceTypes": ["xmlhttprequest"]
+    }
+  }
+]

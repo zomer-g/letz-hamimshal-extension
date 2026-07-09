@@ -1,0 +1,515 @@
+/* Floating overlay — themed to match over.org.il's "גרסאות לעם" design system.
+   All selectors scoped under #govscraper-overlay so we don't collide with the
+   host page's CSS. RTL Hebrew. */
+
+#govscraper-overlay.gs-overlay {
+  /* over.org.il design tokens */
+  --gs-primary: #044E66;
+  --gs-primary-dark: #003647;
+  --gs-primary-light: #06607C;
+  --gs-primary-50: #E8F5F9;
+  --gs-primary-100: #CCEBF3;
+  --gs-primary-200: #9CD9EA;
+  --gs-primary-400: #38AED0;
+  --gs-bg: #F6F6F6;
+  --gs-surface: #ffffff;
+  --gs-border: #E5E7EB;
+  --gs-text: #111827;
+  --gs-text-muted: #4B5563;
+  --gs-success: #22c55e;
+  --gs-danger: #ef4444;
+  --gs-warning: #f59e0b;
+  --gs-radius: 8px;
+  --gs-radius-sm: 6px;
+  --gs-radius-pill: 9999px;
+  --gs-shadow-sm: 0 1px 3px rgba(0, 0, 0, .08);
+  --gs-shadow-md: 0 4px 12px rgba(0, 0, 0, .1);
+
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  left: auto;
+  width: 380px;
+  max-width: calc(100vw - 48px);
+  z-index: 2147483647;
+  background: var(--gs-surface);
+  color: var(--gs-text);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius);
+  box-shadow: var(--gs-shadow-md);
+  padding: 16px 18px 14px;
+  font-family: Rubik, Heebo, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  direction: rtl;
+}
+
+/* Corner placement — driven by the user's setting (overlay.position). The base
+   rule above is bottom-right; these override for the other three corners. */
+#govscraper-overlay.gs-pos-br { top: auto; bottom: 24px; right: 24px; left: auto; }
+#govscraper-overlay.gs-pos-bl { top: auto; bottom: 24px; left: 24px; right: auto; }
+#govscraper-overlay.gs-pos-tr { bottom: auto; top: 24px; right: 24px; left: auto; }
+#govscraper-overlay.gs-pos-tl { bottom: auto; top: 24px; left: 24px; right: auto; }
+
+/* "days since Decision 1933" counter strip (opt-in; below the × row) */
+#govscraper-overlay .gs-counter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 12px;
+  padding: 8px 11px;
+  background: var(--gs-primary);
+  color: #fff;
+  border-radius: var(--gs-radius-sm);
+  text-decoration: none;
+  font-size: 12px;
+  line-height: 1.35;
+}
+#govscraper-overlay .gs-counter:hover { background: var(--gs-primary-dark); }
+#govscraper-overlay .gs-counter-num {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+#govscraper-overlay .gs-counter-txt { flex: 1; }
+
+#govscraper-overlay .gs-close {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  background: transparent;
+  border: 0;
+  font-size: 22px;
+  color: var(--gs-text-muted);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  font-family: inherit;
+}
+#govscraper-overlay .gs-close:hover { color: var(--gs-primary); }
+
+#govscraper-overlay .gs-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding-left: 22px; /* leave room for close × */
+}
+#govscraper-overlay .gs-title-tag {
+  background: var(--gs-primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: var(--gs-radius-pill);
+  white-space: nowrap;
+}
+#govscraper-overlay .gs-title-text {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--gs-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+#govscraper-overlay .gs-title-version {
+  color: var(--gs-text-muted);
+  font-size: 11px;
+  font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+#govscraper-overlay .gs-meta {
+  color: var(--gs-text-muted);
+  font-size: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+#govscraper-overlay .gs-meta-sep { color: var(--gs-border); }
+
+#govscraper-overlay .gs-hint {
+  background: var(--gs-primary-50);
+  border: 1px solid var(--gs-primary-100);
+  border-radius: var(--gs-radius-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gs-text);
+  margin: 0 0 10px;
+}
+#govscraper-overlay .gs-hint strong {
+  color: var(--gs-primary);
+  font-weight: 600;
+}
+
+#govscraper-overlay .gs-progress {
+  background: var(--gs-primary-50);
+  border: 1px solid var(--gs-primary-100);
+  border-radius: var(--gs-radius-sm);
+  padding: 10px 12px;
+  margin: 10px 0 14px;
+  font-size: 12px;
+  color: var(--gs-text);
+}
+#govscraper-overlay .gs-progress.gs-progress-error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #7a1f1f;
+}
+#govscraper-overlay .gs-progress.gs-progress-done {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+#govscraper-overlay .gs-progress-bar {
+  height: 6px;
+  background: var(--gs-primary-100);
+  border-radius: var(--gs-radius-pill);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+#govscraper-overlay .gs-progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--gs-primary);
+  border-radius: var(--gs-radius-pill);
+  transition: width 0.2s ease-out;
+}
+#govscraper-overlay .gs-progress-error .gs-progress-fill { background: var(--gs-danger); }
+#govscraper-overlay .gs-progress-done .gs-progress-fill { background: var(--gs-success); width: 100% !important; }
+#govscraper-overlay .gs-progress-text {
+  font-weight: 500;
+}
+#govscraper-overlay .gs-progress-sub {
+  font-size: 11px;
+  color: var(--gs-text-muted);
+  margin-top: 4px;
+}
+#govscraper-overlay .gs-progress-done .gs-progress-sub { color: #15803d; }
+#govscraper-overlay .gs-progress-error .gs-progress-sub { color: #991b1b; }
+
+#govscraper-overlay .gs-mavat {
+  background: var(--gs-primary-50);
+  border: 1px solid var(--gs-primary-100);
+  border-radius: var(--gs-radius-sm);
+  padding: 8px 10px;
+  margin: 0 0 12px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+#govscraper-overlay .gs-mavat-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gs-text);
+  margin-bottom: 6px;
+}
+#govscraper-overlay .gs-mavat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+  font-size: 13px;
+  color: var(--gs-text);
+  cursor: pointer;
+}
+#govscraper-overlay .gs-mavat-row:hover { color: var(--gs-primary); }
+#govscraper-overlay .gs-mavat-cb {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gs-primary);
+  flex: 0 0 auto;
+  margin: 0;
+}
+#govscraper-overlay .gs-mavat-label { flex: 1; }
+#govscraper-overlay .gs-mavat-count { color: var(--gs-text-muted); font-size: 12px; }
+
+/* Hierarchy: top-level heading row, then indented leaf rows. */
+#govscraper-overlay .gs-mavat-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 2px 3px;
+  margin-top: 4px;
+  cursor: pointer;
+  border-top: 1px solid var(--gs-primary-100);
+}
+#govscraper-overlay .gs-mavat-group:first-of-type { border-top: 0; margin-top: 0; }
+#govscraper-overlay .gs-mavat-group-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gs-primary);
+}
+#govscraper-overlay .gs-mavat-leaf { padding-right: 22px; } /* indent under the heading (RTL) */
+
+/* "download the geometry straight from the map" button (GeoJSON + CSV) */
+#govscraper-overlay .gs-mot-geo-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #fff;
+  background: var(--gs-primary);
+  border: none;
+  border-radius: var(--gs-radius-sm);
+  cursor: pointer;
+}
+#govscraper-overlay .gs-mot-geo-btn:hover { background: var(--gs-primary-dark); }
+#govscraper-overlay .gs-mot-geo-btn:disabled { opacity: .5; cursor: default; }
+
+/* govmap format selector */
+#govscraper-overlay .gs-format {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  background: var(--gs-primary-50);
+  border: 1px solid var(--gs-primary-100);
+  border-radius: var(--gs-radius-sm);
+  font-size: 13px;
+}
+/* stacked variant: format row on top, "extent only" option below */
+#govscraper-overlay .gs-format.gs-format-col { flex-direction: column; align-items: stretch; gap: 8px; }
+#govscraper-overlay .gs-format-row { display: flex; align-items: center; gap: 14px; }
+#govscraper-overlay .gs-extent-opt {
+  padding-top: 8px;
+  border-top: 1px solid var(--gs-primary-100);
+  font-size: 12px;
+  align-items: flex-start;
+}
+#govscraper-overlay .gs-format-label { color: var(--gs-text-muted); font-size: 12px; }
+#govscraper-overlay .gs-format-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--gs-text);
+}
+#govscraper-overlay .gs-mavat-note {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--gs-primary-100);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--gs-text-muted);
+}
+
+#govscraper-overlay .gs-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#govscraper-overlay .gs-btn {
+  border: 0;
+  border-radius: var(--gs-radius);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  line-height: 1.2;
+}
+#govscraper-overlay .gs-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+#govscraper-overlay .gs-btn-primary {
+  background: var(--gs-primary);
+  color: #fff;
+}
+#govscraper-overlay .gs-btn-primary:hover:not(:disabled) { background: var(--gs-primary-dark); }
+#govscraper-overlay .gs-btn-deep {
+  background: transparent;
+  color: var(--gs-primary);
+  border: 1px solid var(--gs-primary);
+}
+#govscraper-overlay .gs-btn-deep:hover:not(:disabled) {
+  background: var(--gs-primary-50);
+}
+#govscraper-overlay .gs-btn-secondary {
+  background: transparent;
+  color: var(--gs-primary);
+  border: 1px solid var(--gs-primary);
+}
+#govscraper-overlay .gs-btn-secondary:hover:not(:disabled) { background: var(--gs-primary-50); }
+#govscraper-overlay .gs-btn-cancel {
+  background: transparent;
+  color: var(--gs-danger);
+  border: 1px solid var(--gs-danger);
+}
+#govscraper-overlay .gs-btn-cancel:hover:not(:disabled) { background: #fef2f2; }
+#govscraper-overlay .gs-btn-ghost {
+  background: transparent;
+  color: var(--gs-text-muted);
+  padding: 8px 10px;
+}
+#govscraper-overlay .gs-btn-ghost:hover { color: var(--gs-text); }
+
+/* Feedback / contact row */
+#govscraper-overlay .gs-contact {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--gs-border);
+  font-size: 12px;
+}
+#govscraper-overlay .gs-contact-label { color: var(--gs-text-muted); }
+#govscraper-overlay .gs-contact-email {
+  color: var(--gs-primary);
+  text-decoration: none;
+  font-weight: 500;
+  direction: ltr;
+}
+#govscraper-overlay .gs-contact-email:hover { text-decoration: underline; }
+#govscraper-overlay .gs-contact-btn {
+  border: 1px solid var(--gs-primary);
+  background: transparent;
+  color: var(--gs-primary);
+  border-radius: var(--gs-radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  line-height: 1.5;
+}
+#govscraper-overlay .gs-contact-btn:hover { background: var(--gs-primary-50); }
+#govscraper-overlay .gs-contact-send { background: var(--gs-primary); color: #fff; }
+#govscraper-overlay .gs-contact-send:hover { background: var(--gs-primary-dark); }
+
+/* עיריית ירושלים — favorites block */
+#govscraper-overlay .gs-jlm {
+  background: var(--gs-primary-50);
+  border: 1px solid var(--gs-primary-100);
+  border-radius: var(--gs-radius-sm);
+  padding: 8px 10px;
+  margin: 0 0 12px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+#govscraper-overlay .gs-jlm-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gs-text);
+  margin-bottom: 6px;
+}
+#govscraper-overlay .gs-jlm-head-sub {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--gs-primary-100);
+}
+#govscraper-overlay .gs-jlm-star-on { color: var(--gs-warning); border-color: var(--gs-warning); }
+
+/* clearly separated Downloads vs Favorites sections */
+#govscraper-overlay .gs-jlm-sec { margin-bottom: 6px; }
+#govscraper-overlay .gs-jlm-sec-fav {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px solid var(--gs-primary-200);
+}
+#govscraper-overlay .gs-jlm-sec-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gs-primary-dark);
+  margin-bottom: 8px;
+}
+/* category tree */
+#govscraper-overlay .gs-jlm-tree { margin: 4px 0 8px; }
+#govscraper-overlay .gs-jlm-group {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gs-text-muted);
+  margin: 8px 0 2px;
+}
+#govscraper-overlay .gs-jlm-cat {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 2px; font-size: 13px; color: var(--gs-text); cursor: pointer;
+}
+#govscraper-overlay .gs-jlm-cat:hover { color: var(--gs-primary); }
+#govscraper-overlay .gs-jlm-cat-label { flex: 1; }
+#govscraper-overlay .gs-jlm-cb { width: 16px; height: 16px; accent-color: var(--gs-primary); flex: 0 0 auto; margin: 0; cursor: pointer; }
+#govscraper-overlay .gs-jlm-caret {
+  background: transparent; border: none; color: var(--gs-text-muted);
+  cursor: pointer; font-size: 12px; padding: 0 4px; font-family: inherit; flex: 0 0 auto;
+}
+#govscraper-overlay .gs-jlm-caret:hover { color: var(--gs-primary); }
+#govscraper-overlay .gs-jlm-sub { margin: 0 22px 4px 0; border-right: 2px solid var(--gs-primary-100); padding-right: 8px; }
+#govscraper-overlay .gs-jlm-leaf {
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 2px; font-size: 12px; color: var(--gs-text); cursor: pointer;
+}
+#govscraper-overlay .gs-jlm-leaf:hover { color: var(--gs-primary); }
+#govscraper-overlay .gs-jlm-leaf > span:first-of-type { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#govscraper-overlay .gs-jlm-btns { display: flex; gap: 6px; margin-top: 6px; }
+#govscraper-overlay .gs-jlm-btns .gs-jlm-add { margin-bottom: 0; }
+#govscraper-overlay .gs-jlm-add {
+  display: block;
+  width: 100%;
+  background: var(--gs-surface);
+  color: var(--gs-primary);
+  border: 1px solid var(--gs-primary-200);
+  border-radius: var(--gs-radius-sm);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  margin-bottom: 8px;
+}
+#govscraper-overlay .gs-jlm-add:hover { background: var(--gs-primary-100); }
+#govscraper-overlay .gs-jlm-add-on { background: var(--gs-primary); color: #fff; border-color: var(--gs-primary); }
+#govscraper-overlay .gs-jlm-add-on:hover { background: var(--gs-primary-dark); }
+#govscraper-overlay .gs-jlm-note {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--gs-text-muted);
+}
+#govscraper-overlay .gs-jlm-list { display: flex; flex-direction: column; gap: 4px; }
+#govscraper-overlay .gs-jlm-fav-row { display: flex; align-items: center; gap: 6px; }
+#govscraper-overlay .gs-jlm-fav {
+  flex: 1;
+  text-align: right;
+  background: var(--gs-surface);
+  color: var(--gs-text);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#govscraper-overlay .gs-jlm-fav:hover { background: var(--gs-primary-50); border-color: var(--gs-primary); color: var(--gs-primary); }
+#govscraper-overlay .gs-jlm-del {
+  flex: 0 0 auto;
+  background: transparent;
+  color: var(--gs-text-muted);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-sm);
+  width: 28px; height: 28px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+}
+#govscraper-overlay .gs-jlm-del:hover { color: var(--gs-danger); border-color: var(--gs-danger); }

@@ -1,0 +1,15 @@
+__build_tmp/
+extension-v*.zip
+extension-firefox-v*.zip
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+
+# Chrome auto-generates this when loading the unpacked extension.
+_metadata/
+
+# Internal maintainer docs — kept local, not published to the public repo.
+CWS_SUBMISSION_PLAN.md
+FINAL_SUBMISSION_CHECKLIST.md
+AUDIT_FINDINGS.md
