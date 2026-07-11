@@ -14,11 +14,12 @@ download the dataset as **CSV / GeoJSON / ZIP**.
 |------|--------------|
 | `www.gov.il` | DynamicCollector / Traditional Collector / content-page datasets → CSV (+ attached files) |
 | `www.nadlan.gov.il` | Real-estate deal history (parcel / street / neighborhood / settlement) → CSV |
-| `www.govmap.gov.il` | GIS layers → GeoJSON (WGS84) + CSV (ITM `geometry_wkt`), packaged in a ZIP |
+| `www.govmap.gov.il` | GIS layers → GeoJSON (WGS84) + CSV (WGS84 `geometry_wkt`), packaged in a ZIP |
 | `mavat.iplan.gov.il` | Planning-authority plans → all documents, organized by the plan's category tree, with per-file selection |
 | `www.idf.il` | Allowlisted unit-site document sections → the PDFs/DOCs + a CSV index |
 | `geo.mot.gov.il` (חצב) | Displayed map layers → geometry (GeoJSON + CSV) and/or the data.gov.il layer files |
 | `ykpubdata.jerusalem.muni.il` | Jerusalem building-licensing files (תיק רישוי בנייה) → documents by category + a CSV per data tab |
+| `main.knesset.gov.il` (מאגר החקיקה) | Bill/law pages → session protocols, draft laws & background documents, with per-file selection |
 
 ## Why it needs no server
 

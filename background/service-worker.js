@@ -38,6 +38,7 @@ const PROXY_HOST_ALLOWLIST = new Set([
   'idf.il',
   'www.idf.il',
   'data.gov.il', // geo.mot.gov.il (חצב) layer files live on data.gov.il (open CKAN)
+  'fs.knesset.gov.il', // Knesset legislation protocol/document files (anonymous, no ACAO)
 ]);
 
 // Whole families of official gov.il open-data API gateways. Many gov.il
@@ -62,6 +63,7 @@ const SENDER_HOST_ALLOWLIST = new Set([
   'mavat.iplan.gov.il',
   'geo.mot.gov.il',
   'ykpubdata.jerusalem.muni.il',
+  'main.knesset.gov.il',
 ]);
 
 function validateSender(sender) {

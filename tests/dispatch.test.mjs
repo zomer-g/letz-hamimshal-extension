@@ -180,6 +180,23 @@ test('jlm rejects other jerusalem.muni.il hosts', () => {
   assertEqual(kindOf('https://www.jerusalem.muni.il/'), null);
 });
 
+// --- knesset (national legislation) ----------------------------------------
+
+test('knesset bill page → knesset_bill with itemId', () => {
+  const p = parse('https://main.knesset.gov.il/apps/legislation/main/bills/2199298');
+  assertEqual(p.scraperId, 'knesset');
+  assertEqual(p.kind, 'knesset_bill');
+  assertEqual(p.itemId, '2199298');
+});
+
+test('knesset rejects non-bill legislation pages', () => {
+  assertEqual(kindOf('https://main.knesset.gov.il/apps/legislation/main/'), null);
+});
+
+test('knesset rejects other knesset hosts', () => {
+  assertEqual(kindOf('https://www.knesset.gov.il/'), null);
+});
+
 // --- registry ordering: specific hosts must NOT be captured by govil ---------
 
 test('ordering: nadlan host not captured by govil', () => {

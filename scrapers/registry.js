@@ -8,8 +8,9 @@ import { idfScraper } from './idf.js';
 import { mavatScraper } from './mavat.js';
 import { motScraper } from './mot.js';
 import { jlmScraper } from './jlm.js';
+import { knessetScraper } from './knesset.js';
 
-const ALL = [govmapScraper, nadlanScraper, idfScraper, mavatScraper, motScraper, jlmScraper, govilScraper];
+const ALL = [govmapScraper, nadlanScraper, idfScraper, mavatScraper, motScraper, jlmScraper, knessetScraper, govilScraper];
 
 export function dispatchByUrl(href) {
   for (const s of ALL) {

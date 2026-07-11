@@ -1,10 +1,9 @@
 {
   "name": "govscraper-extension",
   "version": "0.3.50",
-  "license": "MIT",
-  "homepage": "https://github.com/zomer-g/govscraper-extension-public",
+  "private": true,
   "type": "module",
-  "description": "Manifest-V3 browser extension that detects and downloads open datasets from Israeli government sites (gov.il, Nadlan, GovMap, Mavat, IDF, geo.mot, Jerusalem licensing) — entirely in the browser. Zero-dependency Node tests; build via build-zip.cjs.",
+  "description": "Chrome extension that detects and downloads open datasets from Israeli gov.il sites. Tests are zero-dependency Node scripts. The build script is build-zip.cjs (CommonJS); all source + tests are ESM.",
   "scripts": {
     "test": "node tests/run-all.mjs",
     "build": "node build-zip.cjs",

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "0.3.50",
+  "version": "0.3.52",
   "description": "__MSG_extDescription__",
   "default_locale": "he",
   "icons": {
@@ -33,7 +33,10 @@
     "https://mavat.iplan.gov.il/*",
     "https://geo.mot.gov.il/*",
     "https://data.gov.il/*",
-    "https://*.jerusalem.muni.il/*"
+    "https://*.jerusalem.muni.il/*",
+    "https://main.knesset.gov.il/*",
+    "https://www.knesset.gov.il/*",
+    "https://fs.knesset.gov.il/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'"
@@ -105,7 +108,8 @@
         "https://idf.il/*",
         "https://mavat.iplan.gov.il/*",
         "https://geo.mot.gov.il/*",
-        "https://ykpubdata.jerusalem.muni.il/*"
+        "https://ykpubdata.jerusalem.muni.il/*",
+        "https://main.knesset.gov.il/*"
       ],
       "js": [
         "content/browser-compat.js",
@@ -132,6 +136,7 @@
         "scrapers/mot.js",
         "scrapers/mot-geometry.js",
         "scrapers/jlm.js",
+        "scrapers/knesset.js",
         "scrapers/_content-attachments.js",
         "lib/csv.js",
         "lib/zip.js",
@@ -147,7 +152,8 @@
         "https://idf.il/*",
         "https://mavat.iplan.gov.il/*",
         "https://geo.mot.gov.il/*",
-        "https://ykpubdata.jerusalem.muni.il/*"
+        "https://ykpubdata.jerusalem.muni.il/*",
+        "https://main.knesset.gov.il/*"
       ]
     }
   ]

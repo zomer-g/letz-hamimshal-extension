@@ -52,28 +52,32 @@
 #govscraper-overlay.gs-pos-tl { bottom: auto; top: 24px; left: 24px; right: auto; }
 
 /* "days since Decision 1933" counter strip (opt-in; below the × row) */
+/* !important on the colors: some host sites (e.g. main.knesset.gov.il) force
+   `a { color: … !important }` which otherwise bleeds into these white-on-teal
+   anchors and makes their text unreadable. */
 #govscraper-overlay .gs-counter {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 16px 0 12px;
   padding: 8px 11px;
-  background: var(--gs-primary);
-  color: #fff;
+  background: var(--gs-primary) !important;
+  color: #fff !important;
   border-radius: var(--gs-radius-sm);
-  text-decoration: none;
+  text-decoration: none !important;
   font-size: 12px;
   line-height: 1.35;
 }
-#govscraper-overlay .gs-counter:hover { background: var(--gs-primary-dark); }
+#govscraper-overlay .gs-counter:hover { background: var(--gs-primary-dark) !important; }
 #govscraper-overlay .gs-counter-num {
   font-size: 17px;
   font-weight: 700;
   line-height: 1;
+  color: #fff !important;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-#govscraper-overlay .gs-counter-txt { flex: 1; }
+#govscraper-overlay .gs-counter-txt { flex: 1; color: #fff !important; }
 
 #govscraper-overlay .gs-close {
   position: absolute;
@@ -372,28 +376,28 @@
 }
 #govscraper-overlay .gs-contact-label { color: var(--gs-text-muted); }
 #govscraper-overlay .gs-contact-email {
-  color: var(--gs-primary);
-  text-decoration: none;
+  color: var(--gs-primary) !important;
+  text-decoration: none !important;
   font-weight: 500;
   direction: ltr;
 }
-#govscraper-overlay .gs-contact-email:hover { text-decoration: underline; }
+#govscraper-overlay .gs-contact-email:hover { text-decoration: underline !important; }
 #govscraper-overlay .gs-contact-btn {
   border: 1px solid var(--gs-primary);
   background: transparent;
-  color: var(--gs-primary);
+  color: var(--gs-primary) !important;
   border-radius: var(--gs-radius-sm);
   font-size: 11px;
   font-weight: 500;
   padding: 3px 10px;
   cursor: pointer;
   font-family: inherit;
-  text-decoration: none;
+  text-decoration: none !important;
   line-height: 1.5;
 }
 #govscraper-overlay .gs-contact-btn:hover { background: var(--gs-primary-50); }
-#govscraper-overlay .gs-contact-send { background: var(--gs-primary); color: #fff; }
-#govscraper-overlay .gs-contact-send:hover { background: var(--gs-primary-dark); }
+#govscraper-overlay .gs-contact-send { background: var(--gs-primary) !important; color: #fff !important; }
+#govscraper-overlay .gs-contact-send:hover { background: var(--gs-primary-dark) !important; }
 
 /* עיריית ירושלים — favorites block */
 #govscraper-overlay .gs-jlm {

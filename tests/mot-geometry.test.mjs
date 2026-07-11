@@ -3,8 +3,10 @@
 // content/mot-inject.js extracts each displayed layer's features as
 // { wkt, attrs } in ITM (EPSG:6991, the MOT GovMap tenant's native frame).
 // scrapers/mot-geometry.js turns that into the GovScraper spatial-contract
-// output: GeoJSON in WGS84 (CRS84) + CSV rows whose geometry_wkt stays ITM and
-// sits LAST/un-prefixed. These tests pin that contract.
+// output: ALL published geometry is WGS84 lon/lat (EPSG:4326, the 2026-07-08
+// decision) — GeoJSON (CRS84) and the CSV geometry_wkt column alike, with
+// geometry_wkt LAST/un-prefixed; ITM survives only in bbox_itm. These tests
+// pin that contract.
 //
 // Run: node tests/mot-geometry.test.mjs
 
@@ -22,11 +24,16 @@ const LAYER = {
   error: null,
 };
 
-test('geometry_wkt is preserved as ITM and ordered LAST, un-prefixed', () => {
+test('geometry_wkt is WGS84 lon/lat and ordered LAST, un-prefixed', () => {
   const o = buildLayerOutputs(LAYER);
   assertEqual(o.fieldOrder[o.fieldOrder.length - 1], 'geometry_wkt');
   assert(!o.fieldOrder.some((f) => f.startsWith('_')), 'no leading-underscore columns');
-  assertEqual(o.rows[0].geometry_wkt, 'LINESTRING(180000 660000, 181000 661000)');
+  // ITM input LINESTRING(180000 660000, …) ≈ Tel Aviv → lon ~34.79, lat ~32.03.
+  const wkt = o.rows[0].geometry_wkt;
+  assert(wkt.startsWith('LINESTRING('), `wkt type preserved, got ${wkt.slice(0, 20)}`);
+  const m = wkt.match(/-?\d+(?:\.\d+)?/g);
+  assertClose(parseFloat(m[0]), 34.7867, 1e-3, 'wkt lon');
+  assertClose(parseFloat(m[1]), 32.0325, 1e-3, 'wkt lat');
   assertEqual(o.rows[0].OBJECTID, 5);
   assertEqual(o.rows[0].RAIL_TYPE, 'כבדה');
 });
@@ -58,7 +65,7 @@ test('a layer with no geometry yields count 0 and an empty FeatureCollection', (
   assertEqual(o.fieldOrder[o.fieldOrder.length - 1], 'geometry_wkt');
 });
 
-test('a 3857 WKT is reprojected: geometry_wkt becomes ITM, GeoJSON WGS84', () => {
+test('a 3857 WKT is reprojected: geometry_wkt AND GeoJSON both WGS84', () => {
   // Same Tel Aviv point in Web-Mercator (EPSG:3857).
   const o = buildLayerOutputs({
     code: 'WM', fields: ['OBJECTID'],
@@ -69,10 +76,13 @@ test('a 3857 WKT is reprojected: geometry_wkt becomes ITM, GeoJSON WGS84', () =>
   const [lon, lat] = o.geojson.features[0].geometry.coordinates;
   assert(lon > 34 && lon < 36, `lon in Israel range, got ${lon}`);
   assert(lat > 31 && lat < 33, `lat in Israel range, got ${lat}`);
-  // geometry_wkt must be ITM now (easting ~1.2e5–3e5), NOT the 3857 input.
+  // geometry_wkt must be WGS84 lon/lat too — NOT the 3857 input, NOT ITM.
   const wkt = o.rows[0].geometry_wkt;
   const x = parseFloat(wkt.match(/-?\d+(?:\.\d+)?/)[0]);
-  assert(x > 100000 && x < 350000, `geometry_wkt easting is ITM, got ${x}`);
+  assert(x > 34 && x < 36, `geometry_wkt lon is WGS84, got ${x}`);
+  // and the ITM frame still travels via bbox_itm.
+  const bi = o.geojson.metadata.bbox_itm;
+  assert(bi[0] > 100000 && bi[0] < 350000, `bbox_itm easting is ITM, got ${bi[0]}`);
 });
 
 run('mot-geometry');

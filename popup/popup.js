@@ -259,6 +259,7 @@ const SITES = [
   { id: 'idf', name: 'צה"ל' },
   { id: 'mot', name: 'חצב — משרד התחבורה' },
   { id: 'jlm', name: 'עיריית ירושלים — רישוי בנייה' },
+  { id: 'knesset', name: 'מאגר החקיקה הלאומי — הכנסת' },
 ];
 
 async function getDisabledSites() {

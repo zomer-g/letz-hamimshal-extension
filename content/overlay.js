@@ -182,10 +182,11 @@
     // a file's details page adds a documents download; the address list page
     // renders a per-file download/favorite picker inside the box.
     const isJlm = parsed.kind === 'jlm_tik' || parsed.kind === 'jlm_list' || parsed.kind === 'jlm_home';
-    const jlmBox = isJlm ? el('div', { className: 'gs-jlm' }, []) : null;
-    // All Jerusalem pages drive their downloads from buttons inside the box
-    // (category tree / per-file / per-tik), so no single primary button.
-    const jlmNoPrimary = isJlm;
+    const isKnesset = parsed.kind === 'knesset_bill';
+    const jlmBox = (isJlm || isKnesset) ? el('div', { className: 'gs-jlm' }, []) : null;
+    // These sites drive downloads from buttons inside the box (category tree /
+    // per-file / per-tik), so there is no single primary button.
+    const jlmNoPrimary = isJlm || isKnesset;
 
     const labels = downloadLabelsForKind(parsed.kind);
     const downloadBtn = el('button', {
@@ -348,6 +349,7 @@
       case 'jlm_tik': return 'תיק רישוי בנייה (ירושלים)';
       case 'jlm_list': return 'רשימת תיקים (ירושלים)';
       case 'jlm_home': return 'עיריית ירושלים';
+      case 'knesset_bill': return 'הצעת חוק (הכנסת)';
       default: return kind;
     }
   }
@@ -1009,6 +1011,10 @@
     // עיריית ירושלים: render the favorites block (+ file downloads on tik/list pages).
     if (match.parsed.kind === 'jlm_tik' || match.parsed.kind === 'jlm_list' || match.parsed.kind === 'jlm_home') {
       initJlm({ match, ui });
+    }
+    // מאגר החקיקה (הכנסת): render the protocols/documents category tree.
+    if (match.parsed.kind === 'knesset_bill') {
+      initKnesset({ match, ui });
     }
 
     // Triggered from the popup ("download without the floating window"): for
@@ -1748,6 +1754,149 @@
     if (is(0xD0, 0xCF, 0x11, 0xE0)) return 'doc';            // OLE (doc/xls/ppt)
     if (is(0x7B, 0x5C, 0x72, 0x74, 0x66)) return 'rtf';      // {\rtf
     return '';
+  }
+
+  // --- מאגר החקיקה הלאומי (הכנסת) --------------------------------------------
+
+  // A bill's protocols + documents as a category tree: master checkbox + count +
+  // expandable per-file selection, "select all" via the download-all button.
+  async function initKnesset({ match, ui }) {
+    const box = ui.jlmBox;
+    if (!box) return;
+    const { scraper, parsed } = match;
+    box.replaceChildren();
+    box.appendChild(el('div', { className: 'gs-jlm-sec-title' }, ['⬇ פרוטוקולים ומסמכים']));
+    const status = el('div', { className: 'gs-jlm-note' }, ['טוען את נתוני הצעת החוק…']);
+    box.appendChild(status);
+
+    let result;
+    try { result = await scraper.fetch(parsed, { onProgress: (p) => { status.textContent = p.message || 'טוען…'; } }); }
+    catch (e) { status.textContent = `טעינה נכשלה: ${errMsg(e)}`; return; }
+    ui.knModel = result;
+
+    const cats = result.categories || [];
+    if (!cats.length) { status.textContent = result.warning || 'לא נמצאו קבצים להורדה.'; return; }
+    status.remove();
+    if (result.bill && result.bill.name) box.appendChild(el('div', { className: 'gs-jlm-note' }, [`${result.bill.name}${result.bill.status ? ' · ' + result.bill.status : ''}`]));
+
+    ui.knFileCbs = []; // {catLabel, cb, doc}
+    const tree = el('div', { className: 'gs-jlm-tree' }, []);
+    for (const cat of cats) {
+      const master = el('input', { type: 'checkbox', class: 'gs-jlm-cb' });
+      const fileCbs = [];
+      const sub = el('div', { className: 'gs-jlm-sub', style: 'display:none' }, []);
+      for (const doc of cat.docs) {
+        const fcb = el('input', { type: 'checkbox', class: 'gs-jlm-cb' });
+        fcb.checked = true;
+        ui.knFileCbs.push({ catLabel: cat.label, cb: fcb, doc });
+        fileCbs.push(fcb);
+        sub.appendChild(el('label', { className: 'gs-jlm-leaf' }, [fcb, el('span', {}, [doc.descr]), el('span', { className: 'gs-jlm-count' }, [doc.ext ? `.${doc.ext}` : ''])]));
+      }
+      const refreshMaster = () => {
+        const on = fileCbs.filter(c => c.checked).length;
+        master.checked = on === fileCbs.length && on > 0;
+        master.indeterminate = on > 0 && on < fileCbs.length;
+      };
+      fileCbs.forEach(c => c.addEventListener('change', refreshMaster));
+      master.addEventListener('change', () => { for (const c of fileCbs) c.checked = master.checked; });
+      refreshMaster();
+      const caret = el('button', { className: 'gs-jlm-caret', title: 'הצג/הסתר קבצים' }, ['▸']);
+      caret.addEventListener('click', () => { const open = sub.style.display === 'none'; sub.style.display = open ? '' : 'none'; caret.textContent = open ? '▾' : '▸'; });
+      tree.appendChild(el('label', { className: 'gs-jlm-cat' }, [master, el('span', { className: 'gs-jlm-cat-label' }, [cat.label]), el('span', { className: 'gs-jlm-count' }, [`(${cat.count})`]), caret]));
+      tree.appendChild(sub);
+    }
+
+    // Bill-info CSV toggle.
+    tree.appendChild(el('div', { className: 'gs-jlm-group' }, ['נתונים']));
+    const infoCb = el('input', { type: 'checkbox', class: 'gs-jlm-cb' });
+    infoCb.checked = true;
+    ui.knInfoCb = infoCb;
+    tree.appendChild(el('label', { className: 'gs-jlm-cat' }, [infoCb, el('span', { className: 'gs-jlm-cat-label' }, ['מידע על הצעת החוק (CSV)'])]));
+    box.appendChild(tree);
+
+    const selBtn = el('button', { className: 'gs-jlm-add', title: 'מוריד את הפריטים המסומנים' }, ['⬇ הורד נבחרים']);
+    selBtn.addEventListener('click', () => runKnessetDownload({ ui, parsed, all: false }));
+    const allBtn = el('button', { className: 'gs-jlm-add gs-jlm-add-on', title: 'מוריד את כל הקבצים' }, ['⬇ הורד הכל']);
+    allBtn.addEventListener('click', () => runKnessetDownload({ ui, parsed, all: true }));
+    box.appendChild(el('div', { className: 'gs-jlm-btns' }, [selBtn, allBtn]));
+  }
+
+  async function runKnessetDownload({ ui, parsed, all }) {
+    if (scrapeInProgress) { try { setStatus(ui.progress, 'הורדה כבר פועלת — המתן/י לסיום או לחצ/י בטל.', 'info'); } catch {} return; }
+    const model = ui.knModel;
+    if (!model) return;
+    scrapeInProgress = true;
+    cancelRequested = false;
+    showActionButtons(ui, true);
+    try {
+      const selDocs = (ui.knFileCbs || []).filter(x => all || x.cb.checked).map(x => ({ ...x.doc, catLabel: x.catLabel }));
+      const wantInfo = all || (ui.knInfoCb && ui.knInfoCb.checked);
+      if (!selDocs.length && !wantInfo) throw new Error('לא נבחר דבר להורדה.');
+
+      const knMod = await import(chrome.runtime.getURL('scrapers/knesset.js'));
+      const csvMod = await import(chrome.runtime.getURL('lib/csv.js'));
+      const zipMod = await import(chrome.runtime.getURL('lib/zip.js'));
+      const seg = (s) => String(s || '').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'קטגוריה';
+
+      async function fetchBytesRetry(url) {
+        let lastErr;
+        for (let n = 0; n < 3; n++) {
+          if (cancelRequested) throw new Error('cancelled');
+          try { return await knMod.fetchDocBytes(url); }
+          catch (e) { lastErr = e; await new Promise(r => setTimeout(r, 600 * (n + 1) + Math.floor(Math.random() * 400))); }
+        }
+        throw lastErr;
+      }
+
+      const entries = [];
+      const takenPerFolder = {};
+      let fileIdx = 0, fileFails = 0, okCount = 0;
+      if (selDocs.length) {
+        setProgress(ui.progress, { current: 0, total: selDocs.length, message: 'מוריד קבצים…' });
+        await pool(selDocs, 4, async (doc) => {
+          if (cancelRequested) return;
+          try {
+            const bytes = await fetchBytesRetry(doc.url);
+            const folder = seg(doc.catLabel);
+            takenPerFolder[folder] = takenPerFolder[folder] || [];
+            const name = uniqueNameIn(takenPerFolder[folder], safeFile(doc.descr) + (doc.ext ? `.${doc.ext}` : ''));
+            entries.push({ name: `${folder}/${name}`, data: bytes });
+            okCount++;
+          } catch { fileFails++; }
+          finally {
+            fileIdx++;
+            setProgress(ui.progress, { current: fileIdx, total: selDocs.length, message: 'מוריד קבצים', sub: `${fileIdx}/${selDocs.length}${fileFails ? ` • ${fileFails} כשלים` : ''}` });
+          }
+        }, () => cancelRequested);
+        if (cancelRequested) throw new Error('בוטל על-ידי המשתמש');
+      }
+
+      if (wantInfo && model.billInfoRows) entries.push({ name: 'מידע-הצעת-חוק.csv', data: csvMod.rowsToCsv(model.billInfoRows, model.billInfoFields) });
+      if (selDocs.length) {
+        const catRows = selDocs.map(d => ({ category: d.catLabel, name: d.descr, date: d.date, extension: d.ext, url: d.url }));
+        entries.push({ name: 'קטלוג.csv', data: csvMod.rowsToCsv(catRows, ['category', 'name', 'date', 'extension', 'url']) });
+      }
+      if (!entries.length) throw new Error('לא נוצר תוכן להורדה (ייתכן שכל ההורדות נכשלו).');
+
+      const base = safeFile((model.bill && model.bill.name) || parsed.itemId).slice(0, 60);
+      setStatus(ui.progress, `אורז ZIP (${entries.length} פריטים)…`, 'info');
+      const blob = await zipMod.buildZip(entries);
+      const date = new Date().toISOString().slice(0, 10);
+      const filename = `knesset_${base}_${date}.zip`;
+      const url = URL.createObjectURL(blob);
+      const resp = await chrome.runtime.sendMessage({ type: 'package-and-download', payload: { kind: 'blob-url', filename, url, sizeBytes: blob.size } });
+      if (!resp?.ok) throw new Error(resp?.error || 'אריזת ה-ZIP נכשלה');
+      setTimeout(() => URL.revokeObjectURL(url), 8000);
+
+      setStatus(ui.progress, `הסתיים — ${okCount} קבצים${fileFails ? ` (${fileFails} נכשלו)` : ''}`, fileFails ? 'error' : 'done');
+      try { await logHistory({ scraper: { id: 'knesset' }, parsed: { originalUrl: location.href, collectorName: parsed.collectorName }, result: { rows: selDocs, collectorName: parsed.collectorName }, filename: resp.filename, mode: 'knesset', attachmentCount: okCount }); } catch {}
+    } catch (e) {
+      console.error('[GovScraper] knesset download failed:', e);
+      setStatus(ui.progress, `ההורדה נכשלה: ${errMsg(e)}`, 'error');
+    } finally {
+      scrapeInProgress = false;
+      showActionButtons(ui, false);
+    }
   }
 
   function safeFile(s) {
