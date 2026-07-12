@@ -124,11 +124,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  if (msg.type === 'clear-hide-today') {
-    chrome.storage.local.remove('overlay.hideUntil').then(() => sendResponse({ ok: true }));
-    return true;
-  }
-
   if (msg.type === 'proxy-fetch') {
     handleProxyFetch(msg.payload)
       .then(r => sendResponse({ ok: true, ...r }))

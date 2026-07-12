@@ -52,6 +52,21 @@ function categorizeGenDoc(d) {
 function categoryMeta(slug) {
   return MAVAT_CATEGORIES.find(c => c.slug === slug) || MAVAT_CATEGORIES[MAVAT_CATEGORIES.length - 1];
 }
+
+// The per-file display title. mavat's DOC_NAME is frequently just the category
+// bucket the file sits in ("דרכים"/"בינוי"/"מצב מאושר"), so many sibling files
+// share it. The specific title the site shows per row ("חתכים לאורך גיליון 1 -
+// חתום להפקדה") lives in ED_DOC_INFO. Prefer ED_DOC_INFO when it carries a real
+// name, but fall back to DOC_NAME when ED_DOC_INFO is only a signing status
+// ("חתום להפקדה" / "חתום למתן תוקף" — no descriptive part), which is exactly the
+// "file has no name → the current heading is fine" case.
+function docDisplayName(d) {
+  const info = String(d.ED_DOC_INFO || '').replace(/\s+/g, ' ').trim();
+  const docName = String(d.DOC_NAME || '').replace(/\s+/g, ' ').trim();
+  // \b is ASCII-only, so match a status word followed by a space or end instead.
+  const statusOnly = /^(חתום|מאושר|מופקד|ללא)(\s|$)/.test(info);
+  return (info && !statusOnly) ? info : docName;
+}
 export function categorySlugLabel(slug) {
   return categoryMeta(slug).label;
 }
@@ -111,7 +126,7 @@ export const mavatScraper = {
     const gen = Array.isArray(json.rsPlanDocsGen) ? json.rsPlanDocsGen : [];
     const documents = gen.map((d) => ({
       id: d.ID,
-      name: String(d.DOC_NAME || '').replace(/\s+/g, ' ').trim(),
+      name: docDisplayName(d),
       fileType: String(d.FILE_TYPE || '').trim().toLowerCase(),
       catA: String(d.CAT_A_TITLE || '').trim(),
       catC: String(d.CAT_C_TITLE || '').trim(),

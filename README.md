@@ -1,86 +1,91 @@
-# לץ הממשל — GovScraper (Chrome/Edge extension)
+# GovScraper — Chrome Extension
 
-A Manifest-V3 browser extension that detects open-data pages on Israeli
-government sites and lets you download the underlying dataset **entirely in your
-own browser** — no server, no account, nothing leaves your machine except the
-same requests the site already makes.
+A Chrome extension that mirrors the behavior of the [GOVSCRAPER](https://github.com/zomer-g/) Flask app — but runs **entirely in the user's browser** instead of on a server.
 
-When you open a supported page, a small floating window appears offering to
-download the dataset as **CSV / GeoJSON / ZIP**.
+When you visit a page on:
 
-## Supported sites
+- `www.gov.il` (DynamicCollector / Traditional Collector / Content Pages)
+- `www.nadlan.gov.il` (parcel deal history)
+- `www.govmap.gov.il` (WFS GIS layers)
 
-| Site | What you get |
-|------|--------------|
-| `www.gov.il` | DynamicCollector / Traditional Collector / content-page datasets → CSV (+ attached files) |
-| `www.nadlan.gov.il` | Real-estate deal history (parcel / street / neighborhood / settlement) → CSV |
-| `www.govmap.gov.il` | GIS layers → GeoJSON (WGS84) + CSV (WGS84 `geometry_wkt`), packaged in a ZIP |
-| `mavat.iplan.gov.il` | Planning-authority plans → all documents, organized by the plan's category tree, with per-file selection |
-| `www.idf.il` | Allowlisted unit-site document sections → the PDFs/DOCs + a CSV index |
-| `geo.mot.gov.il` (חצב) | Displayed map layers → geometry (GeoJSON + CSV) and/or the data.gov.il layer files |
-| `ykpubdata.jerusalem.muni.il` | Jerusalem building-licensing files (תיק רישוי בנייה) → documents by category + a CSV per data tab |
-| `main.knesset.gov.il` (מאגר החקיקה) | Bill/law pages → session protocols, draft laws & background documents, with per-file selection |
+…a floating banner appears in the bottom-right, offering to download the whole dataset as a CSV (or ZIP for GovMap layers with GeoJSON).
 
-## Why it needs no server
+## Browser support
 
-The user's browser has already cleared each site's anti-bot / auth layer (e.g.
-Cloudflare on gov.il) by the time they reach the page. A content script's
-same-origin `fetch()` reuses those cookies, so the extension can call the site's
-own data API directly. Cross-origin calls to allowlisted government API hosts are
-proxied through the service worker, which **never** forwards the user's cookies
-cross-origin.
+Chromium only — Chrome 121+, Edge 121+, Brave, Opera, Vivaldi. The extension uses the `chrome.*` Web Extensions namespace directly without a `webextension-polyfill`. Firefox and Safari are not supported targets; porting would require adding `browser_specific_settings`, replacing `declarativeNetRequestWithHostAccess` (Firefox lacks it), and handling MV3 event-page lifecycle differences.
 
-### Security posture
+## Geospatial output (GovMap)
 
-- **No CAPTCHA / bot-detection bypass.** Where a site gates data or downloads
-  behind reCAPTCHA (e.g. mavat, nadlan), the extension does **not** forge tokens.
-  It passively captures the responses the page itself produces, or drives the
-  site's own buttons so the site runs its own reCAPTCHA.
-- The service worker only talks to an **allowlist** of government API hosts, only
-  accepts messages from content scripts running on the supported hosts, and only
-  triggers downloads for `blob:` URLs it minted itself.
-- No analytics, no tracking, no remote code. All processing is local.
+GovMap features are requested in **EPSG:6991** (Israeli Grid 05/12 — the current authoritative Survey of Israel datum). CSV rows include a `geometry_wkt` column with the full ITM geometry as WKT (Point/LineString/Polygon/...), so the file is loadable in QGIS via "Add Delimited Text Layer" → WKT column → CRS EPSG:6991. `_lon`/`_lat` centroid columns remain for quick spreadsheet inspection. The GeoJSON sidecar in the ZIP is always WGS84.
 
-## Geospatial output (GovMap / חצב)
+## Why this works without a server
 
-Geometry is published as a **WGS84** GeoJSON sidecar plus a CSV whose
-`geometry_wkt` column holds the full geometry as WKT in **ITM (EPSG:6991)** — the
-current authoritative Survey-of-Israel datum. Load the CSV in QGIS via
-*Add Delimited Text Layer → WKT column → CRS EPSG:6991*.
+`gov.il` is protected by Cloudflare, which is why the original Python pipeline uses `cloudscraper` server-side. But **the user's browser is already past Cloudflare** when they reach the page — their CF cookies are valid. A content script's same-origin `fetch()` reuses those cookies for free, so the extension can hit `/he/api/DynamicCollector` directly without any anti-bot dance.
+
+For nadlan, the SPA's own JS signs the JWT and gets the reCAPTCHA token. We just install a MAIN-world hook that captures the `/deal-data` response after the page issues it.
+
+For govmap, the WFS endpoint is plain OGC — no auth, no challenge.
 
 ## Development
 
 ```bash
-# Load unpacked: chrome://extensions → Developer mode → Load unpacked → this dir
-node build-zip.cjs                 # build the CWS upload zip
-node build-zip.cjs --target=firefox  # Firefox/AMO variant
-npm test                           # zero-dependency Node test suite
+# Generate placeholder icons (one-time)
+node tools/generate-icons.js
+
+# Load the unpacked extension
+# 1. chrome://extensions
+# 2. Developer mode ON
+# 3. Load unpacked → select this directory
+
+# Build CWS upload zip
+node build-zip.cjs   # or: npm run build
 ```
 
-No `npm install` — the build and tests use only Node built-ins.
+No `npm install` step — the only runtime dependencies are Node built-ins (`fs`, `zlib`).
 
 ## Tests
 
-Zero-dependency Node tests (`node tests/run-all.mjs`). Coverage includes URL →
-scraper routing, RFC-4180 CSV escaping, ZIP round-trip + Hebrew filename
-encodings, gov.il response transforms, and ITM↔WGS84 projection parity.
+Zero-dependency Node tests (no framework). Run the whole suite after any change:
+
+```bash
+npm test          # or: node tests/run-all.mjs
+```
+
+Each suite is also runnable on its own, e.g. `node tests/dispatch.test.mjs`. Coverage:
+
+| Suite | What it pins |
+|-------|--------------|
+| `dispatch.test.mjs` | URL → scraper routing for all 5 scrapers + registry ordering |
+| `csv.test.mjs` | RFC-4180 escaping, utf-8-sig BOM, value formatting |
+| `zip.test.mjs` | ZIP STORE round-trip, CRC-32, Hebrew UTF-8 + CP862 filenames |
+| `govil-transform.test.mjs` | item/total extraction, row flattening, attachment discovery, ng-init parse |
+| `govmap-proj.test.mjs` | ITM↔WGS84 projection, CRS detection, centroid, bbox |
+| `wkt-parity.test.mjs` | GeoJSON→WKT byte-parity with the Main (Python) scraper |
+
+A suite exits non-zero on the first failing assertion, so `npm test` is CI-friendly.
 
 ## Architecture
 
 ```
-content/detector.js   → matches the URL, decides if the page is scrapeable
-content/overlay.js    → the floating UI; drives the scrape/download
-content/*-inject.js   → MAIN-world hooks that capture a page's own API responses
-scrapers/<source>.js  → per-site parseUrl + fetch + flatten
-lib/csv.js, zip.js    → build CSV/ZIP in-page
-background/service-worker.js → allowlisted proxy fetch + chrome.downloads
+content/detector.js  →  URL pattern match
+content/overlay.js   →  floating UI, drives scrape
+scrapers/<source>.js →  same-origin fetch + flatten
+lib/csv.js, zip.js   →  build CSV/ZIP blob in-page
+background/sw.js     →  chrome.downloads + chrome.scripting (nadlan inject)
 ```
 
-## Privacy
+See [REVIEWER_NOTES.md](REVIEWER_NOTES.md) for the full file map and data-flow diagram.
 
-The extension stores only local settings and a short download history in
-`chrome.storage.local`. See [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
+## CWS submission
 
-## License
+1. Icons are generated by `node tools/generate-icons.js` (download-arrow glyph, over.org.il teal).
+2. Privacy & terms pages are hosted on z-g.co.il (Next.js), not as static files here:
+   - https://www.z-g.co.il/govscraper · /privacy · /terms
+3. Run `node build-zip.cjs`.
+4. Upload the resulting `extension-v{version}.zip` to the CWS dashboard.
+5. Paste the texts from `CWS_DASHBOARD_TEXTS.md` and `STORE_LISTING.md`.
+6. In the reviewer-notes box, paste `REVIEWER_NOTES.md`.
 
-[MIT](LICENSE).
+## Server fallback (optional, off by default)
+
+If `over.org.il` ships a public `POST /api/extension/dispatch` endpoint (see plan §"Server fallback" — it does NOT exist as of writing), users can enable the fallback flag in the popup and get a button to send the page URL to over.org.il when local scraping isn't viable. The endpoint must respond with `{ tracked_dataset_id, status_url, expected_eta_seconds }` and include CORS headers for `chrome-extension://*`.

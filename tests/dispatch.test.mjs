@@ -189,7 +189,14 @@ test('knesset bill page → knesset_bill with itemId', () => {
   assertEqual(p.itemId, '2199298');
 });
 
-test('knesset rejects non-bill legislation pages', () => {
+test('knesset law page → knesset_law with itemId', () => {
+  const p = parse('https://main.knesset.gov.il/apps/legislation/main/laws/2000613');
+  assertEqual(p.scraperId, 'knesset');
+  assertEqual(p.kind, 'knesset_law');
+  assertEqual(p.itemId, '2000613');
+});
+
+test('knesset rejects non-bill/law legislation pages', () => {
   assertEqual(kindOf('https://main.knesset.gov.il/apps/legislation/main/'), null);
 });
 

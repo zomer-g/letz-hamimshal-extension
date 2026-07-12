@@ -26,6 +26,7 @@
     <button class="tab active" data-tab="settings">הגדרות</button>
     <button class="tab" data-tab="downloads">הורדות</button>
     <button class="tab" data-tab="mavat">מנהל התכנון</button>
+    <button class="tab" data-tab="jlm">עיריית ירושלים</button>
     <button class="tab" data-tab="rationale">רציונל</button>
   </nav>
 
@@ -39,6 +40,20 @@
     <h2>מידע תכנוני (מנהל התכנון)</h2>
     <p class="tag" style="margin-bottom:8px">קטגוריות ברירת מחדל להורדה מתוכנית ב-mavat.iplan.gov.il:</p>
     <div id="mavatCats"></div>
+
+    <h2>מילות חיפוש לברירת מחדל</h2>
+    <p class="tag" style="margin-bottom:6px">לא חובה. הזן מילה או כמה מילים מופרדות בפסיק (למשל: <b>תשריט, בינוי</b>). כשמוגדרות מילות חיפוש, ייבחרו מראש בחלון ההורדה רק קבצים ששמם מכיל לפחות אחת מהן — אפשר לשנות ידנית לפני ההורדה.</p>
+    <input type="text" id="mavatSearchTerms" class="text-input" placeholder="למשל: תשריט, בינוי" dir="rtl">
+    <label class="row" style="margin-top:8px">
+      <input type="checkbox" id="mavatSearchInCats">
+      <span>חפש גם בשמות הקטגוריות ותתי-הקטגוריות (ולא רק בשמות הקבצים)</span>
+    </label>
+  </div>
+
+  <div class="panel" id="panel-jlm" hidden>
+    <h2>עיריית ירושלים — רישוי בנייה</h2>
+    <p class="tag" style="margin-bottom:6px">קטגוריות מסומנות כברירת מחדל בהורדת תיק (מסמכים + טבלאות נתונים):</p>
+    <div id="jlmCats"></div>
   </div>
 
   <div class="panel" id="panel-settings">
@@ -54,15 +69,10 @@
       <button data-pos="bottom-left" title="למטה משמאל">↙</button>
       <button data-pos="bottom-right" title="למטה מימין">↘</button>
     </div>
-    <button id="clearHideToday" class="ghost">הצג שוב את החלון היום</button>
 
     <h2>אתרים נתמכים</h2>
     <p class="tag" style="margin-bottom:6px">בטל סימון כדי להשבית את התוסף באתר מסוים (למשל להפעיל רק ב-GovMap):</p>
     <div id="sitesList"></div>
-
-    <h2>עיריית ירושלים — רישוי בנייה</h2>
-    <p class="tag" style="margin-bottom:6px">קטגוריות מסומנות כברירת מחדל בהורדת תיק (מסמכים + טבלאות נתונים):</p>
-    <div id="jlmCats"></div>
 
     <h2>כללי</h2>
     <label class="row">

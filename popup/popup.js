@@ -161,13 +161,6 @@ async function initSettings() {
   fb.addEventListener('change', () => chrome.storage.local.set({ 'featureFlag.overOrgFallback': fb.checked }));
 }
 
-document.getElementById('clearHideToday').addEventListener('click', async () => {
-  await chrome.runtime.sendMessage({ type: 'clear-hide-today' });
-  const btn = document.getElementById('clearHideToday');
-  const orig = btn.textContent;
-  btn.textContent = 'נוקה ✓';
-  setTimeout(() => { btn.textContent = orig; }, 1200);
-});
 
 // --- mavat default categories ----------------------------------------------
 // Keep in sync with MAVAT_CATEGORIES in scrapers/mavat.js (excluding "other").
@@ -206,6 +199,28 @@ async function saveMavatCats() {
   const slugs = [...document.querySelectorAll('#mavatCats input[type=checkbox]')]
     .filter(cb => cb.checked).map(cb => cb.dataset.slug);
   await chrome.storage.local.set({ 'mavat.defaultCategories': slugs });
+}
+
+// Default-download search terms (comma-separated). When set, the mavat default
+// download keeps only files whose name contains at least one term. Read in
+// content/overlay.js → runMavatDownload (useDefault path).
+async function initMavatSearch() {
+  const input = document.getElementById('mavatSearchTerms');
+  if (!input) return;
+  const cfg = await chrome.storage.local.get(['mavat.defaultSearchTerms', 'mavat.searchInCategories']);
+  input.value = typeof cfg['mavat.defaultSearchTerms'] === 'string' ? cfg['mavat.defaultSearchTerms'] : '';
+  input.addEventListener('input', () => {
+    chrome.storage.local.set({ 'mavat.defaultSearchTerms': input.value });
+  });
+
+  // Whether the search filter also matches category / sub-category titles.
+  const inCats = document.getElementById('mavatSearchInCats');
+  if (inCats) {
+    inCats.checked = cfg['mavat.searchInCategories'] === true;
+    inCats.addEventListener('change', () => {
+      chrome.storage.local.set({ 'mavat.searchInCategories': inCats.checked });
+    });
+  }
 }
 
 // --- Jerusalem (jlm) default download categories ---------------------------
@@ -296,6 +311,7 @@ initPageCard();
 renderHistory();
 initSettings();
 renderMavatCats();
+initMavatSearch();
 renderJlmCats();
 renderSites();
 renderCounter();

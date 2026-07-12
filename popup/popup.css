@@ -136,6 +136,24 @@ h2 {
 .row input { margin-top: 3px; }
 .row span { color: var(--gs-text); line-height: 1.4; }
 
+.text-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--gs-surface);
+  border: 1px solid var(--gs-border);
+  color: var(--gs-text);
+  border-radius: var(--gs-radius-sm);
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.text-input:focus {
+  outline: none;
+  border-color: var(--gs-primary);
+  box-shadow: 0 0 0 2px var(--gs-primary-50);
+}
+
 button.ghost {
   background: var(--gs-surface);
   border: 1px solid var(--gs-border);

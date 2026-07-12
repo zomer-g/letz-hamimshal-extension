@@ -65,12 +65,12 @@
       return;
     }
 
-    // The floating window is shown automatically only when enabled (default on)
-    // and not snoozed for today. When gated, remove any existing overlay — the
-    // user can still download from the popup ("download without the window").
-    const { 'overlay.enabled': enabled, 'overlay.hideUntil': hideUntil } =
-      await chrome.storage.local.get(['overlay.enabled', 'overlay.hideUntil']);
-    if (enabled === false || (hideUntil && Date.now() < hideUntil)) {
+    // The floating window is shown automatically whenever enabled (default on).
+    // When disabled, remove any existing overlay — the user can still download
+    // from the popup ("download without the window").
+    const { 'overlay.enabled': enabled } =
+      await chrome.storage.local.get(['overlay.enabled']);
+    if (enabled === false) {
       window.GovScraperOverlay?.remove();
       return;
     }
@@ -82,7 +82,7 @@
   chrome.storage.onChanged.addListener((ch, area) => {
     if (area !== 'local') return;
     if (ch['sites.disabled']) disabledSites = new Set(Array.isArray(ch['sites.disabled'].newValue) ? ch['sites.disabled'].newValue : []);
-    if (ch['overlay.enabled'] || ch['overlay.hideUntil'] || ch['sites.disabled']) checkAndUpdate(true);
+    if (ch['overlay.enabled'] || ch['sites.disabled']) checkAndUpdate(true);
   });
 
   // Commands from the popup: report what's on this page, and run a download

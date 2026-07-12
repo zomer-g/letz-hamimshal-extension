@@ -105,7 +105,7 @@
     ]);
   }
 
-  function buildOverlay({ match, onDownload, onDeepDownload, onFallback, onHide, onClose, onCancel, onMavatSelected, onMavatDefault }) {
+  function buildOverlay({ match, onDownload, onDeepDownload, onFallback, onClose, onCancel, onMavatDownload }) {
     const { scraper, parsed } = match;
     const supportsDeep = SUPPORTS_DEEP_SCRAPE.has(parsed.kind);
 
@@ -182,7 +182,7 @@
     // a file's details page adds a documents download; the address list page
     // renders a per-file download/favorite picker inside the box.
     const isJlm = parsed.kind === 'jlm_tik' || parsed.kind === 'jlm_list' || parsed.kind === 'jlm_home';
-    const isKnesset = parsed.kind === 'knesset_bill';
+    const isKnesset = parsed.kind === 'knesset_bill' || parsed.kind === 'knesset_law';
     const jlmBox = (isJlm || isKnesset) ? el('div', { className: 'gs-jlm' }, []) : null;
     // These sites drive downloads from buttons inside the box (category tree /
     // per-file / per-tik), so there is no single primary button.
@@ -203,16 +203,14 @@
       style: (supportsDeep && !isMavat) ? '' : 'display:none',
     }, [labels.deep]);
     // mavat buttons (hidden until the picker is populated).
-    const mavatSelBtn = el('button', {
-      className: 'gs-btn gs-btn-primary', onClick: onMavatSelected,
-      title: 'מוריד את הקטגוריות המסומנות, מאורגנות בתיקיות לפי שם התוכנית',
+    // Single download button: the picker is pre-seeded from the default
+    // categories + default search terms, so the checkboxes already show exactly
+    // what will download. This button downloads whatever is currently checked.
+    const mavatDownloadBtn = el('button', {
+      className: 'gs-btn gs-btn-primary', onClick: onMavatDownload,
+      title: 'מוריד את הקבצים המסומנים, מאורגנים בתיקיות לפי שם התוכנית',
       style: 'display:none',
-    }, ['הורד נבחרים']);
-    const mavatDefBtn = el('button', {
-      className: 'gs-btn gs-btn-deep', onClick: onMavatDefault,
-      title: 'מוריד את קטגוריות ברירת המחדל שהגדרת בהגדרות התוסף',
-      style: 'display:none',
-    }, ['הורד ברירת מחדל']);
+    }, ['הורד']);
     const cancelBtn = el('button', {
       className: 'gs-btn gs-btn-secondary gs-btn-cancel',
       onClick: onCancel,
@@ -220,9 +218,6 @@
     }, ['בטל']);
     const fallbackBtn = el('button', { className: 'gs-btn gs-btn-secondary', onClick: onFallback, style: 'display:none' }, [
       'שלח לעיבוד חיצוני',
-    ]);
-    const hideBtn = el('button', { className: 'gs-btn gs-btn-ghost', onClick: onHide }, [
-      'הסתר היום',
     ]);
     const closeBtn = el('button', { className: 'gs-close', onClick: onClose, title: 'סגור' }, ['×']);
 
@@ -237,7 +232,7 @@
       el('span', { className: 'gs-counter-txt' }, ['ימים מאז שהממשלה החליטה שמאגרי המידע של המדינה ייפתחו לציבור ויהיו נגישים · רציונל ↗']),
     ]);
 
-    const buttons = el('div', { className: 'gs-buttons' }, [downloadBtn, deepBtn, mavatSelBtn, mavatDefBtn, cancelBtn, fallbackBtn, hideBtn]);
+    const buttons = el('div', { className: 'gs-buttons' }, [downloadBtn, deepBtn, mavatDownloadBtn, cancelBtn, fallbackBtn]);
 
     // govmap: keep the download button label in sync with the format choice.
     if (isWfs && formatCsvCb && formatGeojsonCb) {
@@ -266,12 +261,17 @@
       buildContactRow(),
     ]);
 
-    // Conditionally show fallback button
-    import(chrome.runtime.getURL('lib/over-org-client.js')).then(m => m.isFallbackEnabled()).then(enabled => {
-      if (enabled) fallbackBtn.style.display = '';
-    }).catch(() => {});
+    // "שלח לעיבוד חיצוני" is hidden for now — the external processing API is not
+    // usable at the moment (and may not ship). The button + runFallback path are
+    // kept intact so re-enabling is a one-line change here.
+    const SHOW_FALLBACK = false;
+    if (SHOW_FALLBACK) {
+      import(chrome.runtime.getURL('lib/over-org-client.js')).then(m => m.isFallbackEnabled()).then(enabled => {
+        if (enabled) fallbackBtn.style.display = '';
+      }).catch(() => {});
+    }
 
-    return { root, progress, downloadBtn, deepBtn, cancelBtn, fallbackBtn, mavatBox, mavatSelBtn, mavatDefBtn, formatCsvCb, formatGeojsonCb, extentViewCb, motBox, jlmBox };
+    return { root, progress, downloadBtn, deepBtn, cancelBtn, fallbackBtn, mavatBox, mavatDownloadBtn, formatCsvCb, formatGeojsonCb, extentViewCb, motBox, jlmBox };
   }
 
   function downloadLabelsForKind(kind) {
@@ -350,6 +350,7 @@
       case 'jlm_list': return 'רשימת תיקים (ירושלים)';
       case 'jlm_home': return 'עיריית ירושלים';
       case 'knesset_bill': return 'הצעת חוק (הכנסת)';
+      case 'knesset_law': return 'חוק (הכנסת)';
       default: return kind;
     }
   }
@@ -986,16 +987,9 @@
       cancelRequested = true;
       try { setStatus(ui.progress, 'מבטל… (ייעצר תוך כמה שניות)', 'info'); } catch {}
     };
-    const onMavatSelected = () => runMavatDownload({ match, ui, useDefault: false });
-    const onMavatDefault = () => runMavatDownload({ match, ui, useDefault: true });
-    const onHide = async () => {
-      const tomorrow = new Date();
-      tomorrow.setHours(24, 0, 0, 0);
-      await chrome.storage.local.set({ 'overlay.hideUntil': tomorrow.getTime() });
-      remove();
-    };
+    const onMavatDownload = () => runMavatDownload({ match, ui });
     const onClose = () => remove();
-    ui = buildOverlay({ match, onDownload, onDeepDownload, onFallback, onHide, onClose, onCancel, onMavatSelected, onMavatDefault });
+    ui = buildOverlay({ match, onDownload, onDeepDownload, onFallback, onClose, onCancel, onMavatDownload });
     overlayEl = ui.root;
     applyPositionClass(overlayEl);
     document.body.appendChild(overlayEl);
@@ -1012,8 +1006,8 @@
     if (match.parsed.kind === 'jlm_tik' || match.parsed.kind === 'jlm_list' || match.parsed.kind === 'jlm_home') {
       initJlm({ match, ui });
     }
-    // מאגר החקיקה (הכנסת): render the protocols/documents category tree.
-    if (match.parsed.kind === 'knesset_bill') {
+    // מאגר החקיקה (הכנסת): render the protocols/documents (bill) or amendments (law) tree.
+    if (match.parsed.kind === 'knesset_bill' || match.parsed.kind === 'knesset_law') {
       initKnesset({ match, ui });
     }
 
@@ -1037,9 +1031,21 @@
       ui.progress.style.display = 'none';
       const mavatMod = await import(chrome.runtime.getURL('scrapers/mavat.js'));
 
-      // default category selection from settings (all on if unset)
-      const stored = (await chrome.storage.local.get('mavat.defaultCategories'))['mavat.defaultCategories'];
+      // default selection from settings, applied to the checkboxes up front so
+      // the picker shows exactly what will download by default:
+      //   • default categories (all on if unset)
+      //   • default search terms — within a checked category, only files whose
+      //     name matches a term stay checked (comma-separated, substring match)
+      const cfg = await chrome.storage.local.get(['mavat.defaultCategories', 'mavat.defaultSearchTerms', 'mavat.searchInCategories']);
+      const stored = cfg['mavat.defaultCategories'];
       const defaults = Array.isArray(stored) ? new Set(stored) : null; // null = all
+      const terms = String(cfg['mavat.defaultSearchTerms'] || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      // When on, a term also matches against a file's category / sub-category
+      // titles (its chain), not only its own name.
+      const searchInCats = cfg['mavat.searchInCategories'] === true;
+      const termHit = (text) => { const n = String(text || '').toLowerCase(); return terms.some(t => n.includes(t)); };
+      const chainHit = (chain) => Array.isArray(chain) && chain.some(seg => termHit(seg));
+      const docMatches = terms.length ? (d) => termHit(d.name) || (searchInCats && chainHit(d.chain)) : null;
 
       const box = ui.mavatBox;
       box.replaceChildren();
@@ -1111,7 +1117,10 @@
             const fileCbs = [];
             for (const d of catDocs) {
               const fcb = el('input', { type: 'checkbox', class: 'gs-mavat-cb' });
-              fcb.checked = defOn;
+              // Pre-seed: checked only if the category is on by default AND (no
+              // search terms, or this file matches — by name, and optionally by
+              // its category titles). The user sees it immediately and can toggle.
+              fcb.checked = defOn && (docMatches ? docMatches(d) : true);
               fileCbs.push(fcb);
               sub.appendChild(el('label', { className: 'gs-jlm-leaf' }, [fcb, el('span', {}, [d.name || 'קובץ'])]));
             }
@@ -1142,6 +1151,10 @@
               caret.textContent = open ? '▾' : '▸';
             });
             refreshMaster();
+          } else if (docMatches && searchInCats && cat.native) {
+            // No per-file drill-down for this category — when category matching is
+            // enabled, decide by its own category / sub-category titles.
+            cb.checked = defOn && chainHit(cat.chain || [cat.label]);
           }
 
           ui.mavatChecks.push(cb);
@@ -1152,11 +1165,10 @@
       renderNode(root, 0);
       // Explain how mavat downloads work (its own reCAPTCHA-gated ZIP per category).
       const note = el('div', { className: 'gs-mavat-note' }, [
-        'לחצ/י ▸ ליד קטגוריה כדי לבחור קבצים ספציפיים. הקבצים נאספים דרך מנגנון ההורדה של mavat עצמו ונארזים ל-ZIP אחד, מסודר לפי קטגוריות (תיקייה לכל קטגוריה).',
+        'הסימון מוצג לפי ברירת המחדל שהגדרת (קטגוריות + מילות חיפוש). אפשר לשנות ידנית — לחצ/י ▸ ליד קטגוריה כדי לבחור קבצים ספציפיים. "הורד" מוריד את המסומן בלבד: הקבצים נאספים דרך מנגנון ההורדה של mavat עצמו ונארזים ל-ZIP אחד, מסודר לפי קטגוריות (תיקייה לכל קטגוריה).',
       ]);
       box.appendChild(note);
-      ui.mavatSelBtn.style.display = '';
-      ui.mavatDefBtn.style.display = '';
+      ui.mavatDownloadBtn.style.display = '';
     } catch (e) {
       console.error('[GovScraper] mavat init failed:', e);
       setStatus(ui.progress, `טעינת התוכנית נכשלה: ${errMsg(e)}`, 'error');
@@ -1169,15 +1181,14 @@
   // suppresses the page's loose per-file save. Here we unpack each category ZIP,
   // fix its legacy-Hebrew filenames, and merge everything into ONE clean ZIP
   // ({planNumber}/{category}/{file}) plus an optional catalog CSV.
-  async function runMavatDownload({ match, ui, useDefault }) {
+  async function runMavatDownload({ match, ui }) {
     if (scrapeInProgress) return;
     const result = ui.mavatResult;
     if (!result) return;
     scrapeInProgress = true;
     cancelRequested = false;
     showActionButtons(ui, true);
-    ui.mavatSelBtn.disabled = true;
-    ui.mavatDefBtn.disabled = true;
+    ui.mavatDownloadBtn.disabled = true;
 
     const nonce = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()) + Math.random();
     const zipQueue = [];
@@ -1204,19 +1215,13 @@
       const csvMod = await import(chrome.runtime.getURL('lib/csv.js'));
       const zipMod = await import(chrome.runtime.getURL('lib/zip.js'));
 
-      // Which categories? Default uses the settings slugs; manual uses the exact
-      // checked leaves (by key — two sections can share a slug, e.g. נספחים).
-      let chosen;
-      if (useDefault) {
-        const stored = (await chrome.storage.local.get('mavat.defaultCategories'))['mavat.defaultCategories'];
-        const defs = Array.isArray(stored) ? new Set(stored) : null; // null = all
-        chosen = defs ? result.categories.filter(c => defs.has(c.slug)) : result.categories.slice();
-      } else {
-        // Include a category if its master is checked OR indeterminate (some of
-        // its individual files are selected via the drill-down).
-        const keys = new Set(ui.mavatChecks.filter(cb => cb.checked || cb.indeterminate).map(cb => cb.dataset.key));
-        chosen = result.categories.filter(c => keys.has(c.key));
-      }
+      // Download whatever is currently selected in the picker. The picker was
+      // pre-seeded from the default categories + default search terms at load, so
+      // "checked" already reflects the default unless the user changed it. Include
+      // a category if its master is checked OR indeterminate (some of its files
+      // selected via the drill-down); per-file selection is applied below by key.
+      const keys = new Set(ui.mavatChecks.filter(cb => cb.checked || cb.indeterminate).map(cb => cb.dataset.key));
+      const chosen = result.categories.filter(c => keys.has(c.key));
       if (!chosen.length) throw new Error('לא נבחרה אף קטגוריה.');
 
       const nativeCats = chosen.filter(c => c.native);
@@ -1255,9 +1260,10 @@
           // file extension so the file still opens correctly.
           const zipFiles = await zipMod.readZip(blob);
           const catDocs = mavatMod.docsForChain(result.documents, cat.chain || [cat.label]);
-          // Per-file selection (manual mode only): keep just the checked files,
-          // matched to ZIP entries by order. Default mode keeps everything.
-          const fileCbs = (!useDefault && ui.mavatFileCbs) ? ui.mavatFileCbs[cat.key] : null;
+          // Per-file selection: keep just the checked files, matched to ZIP entries
+          // by order. A category with no drill-down (docsForChain empty) has no
+          // per-file checkboxes → selSet null → keep every file in it.
+          const fileCbs = ui.mavatFileCbs ? ui.mavatFileCbs[cat.key] : null;
           const selSet = fileCbs ? new Set(fileCbs.map((c, i) => (c.checked ? i : -1)).filter(i => i >= 0)) : null;
           zipFiles.forEach((f, i) => {
             if (selSet && !selSet.has(i)) return; // unselected file → skip
@@ -1304,8 +1310,7 @@
       window.removeEventListener('message', onZipMsg);
       scrapeInProgress = false;
       showActionButtons(ui, false);
-      ui.mavatSelBtn.disabled = false;
-      ui.mavatDefBtn.disabled = false;
+      ui.mavatDownloadBtn.disabled = false;
     }
   }
 
@@ -1764,9 +1769,10 @@
     const box = ui.jlmBox;
     if (!box) return;
     const { scraper, parsed } = match;
+    const isLaw = parsed.kind === 'knesset_law';
     box.replaceChildren();
-    box.appendChild(el('div', { className: 'gs-jlm-sec-title' }, ['⬇ פרוטוקולים ומסמכים']));
-    const status = el('div', { className: 'gs-jlm-note' }, ['טוען את נתוני הצעת החוק…']);
+    box.appendChild(el('div', { className: 'gs-jlm-sec-title' }, [isLaw ? '⬇ תיקוני חוק ומסמכים' : '⬇ פרוטוקולים ומסמכים']));
+    const status = el('div', { className: 'gs-jlm-note' }, [isLaw ? 'טוען את נתוני החוק…' : 'טוען את נתוני הצעת החוק…']);
     box.appendChild(status);
 
     let result;
@@ -1775,7 +1781,7 @@
     ui.knModel = result;
 
     const cats = result.categories || [];
-    if (!cats.length) { status.textContent = result.warning || 'לא נמצאו קבצים להורדה.'; return; }
+    if (!cats.length && !(result.dataCsvs || []).length) { status.textContent = result.warning || 'לא נמצאו קבצים להורדה.'; return; }
     status.remove();
     if (result.bill && result.bill.name) box.appendChild(el('div', { className: 'gs-jlm-note' }, [`${result.bill.name}${result.bill.status ? ' · ' + result.bill.status : ''}`]));
 
@@ -1806,12 +1812,22 @@
       tree.appendChild(sub);
     }
 
-    // Bill-info CSV toggle.
+    // Info / data CSV toggles.
     tree.appendChild(el('div', { className: 'gs-jlm-group' }, ['נתונים']));
     const infoCb = el('input', { type: 'checkbox', class: 'gs-jlm-cb' });
     infoCb.checked = true;
     ui.knInfoCb = infoCb;
-    tree.appendChild(el('label', { className: 'gs-jlm-cat' }, [infoCb, el('span', { className: 'gs-jlm-cat-label' }, ['מידע על הצעת החוק (CSV)'])]));
+    tree.appendChild(el('label', { className: 'gs-jlm-cat' }, [infoCb, el('span', { className: 'gs-jlm-cat-label' }, [isLaw ? 'מידע על החוק (CSV)' : 'מידע על הצעת החוק (CSV)'])]));
+
+    // Law pages carry extra catalog CSVs (corrections list, secondary legislation,
+    // related bills/laws) for the collections that have no downloadable file.
+    ui.knDataCbs = []; // {csv, cb}
+    for (const csv of (result.dataCsvs || [])) {
+      const dcb = el('input', { type: 'checkbox', class: 'gs-jlm-cb' });
+      dcb.checked = true;
+      ui.knDataCbs.push({ csv, cb: dcb });
+      tree.appendChild(el('label', { className: 'gs-jlm-cat' }, [dcb, el('span', { className: 'gs-jlm-cat-label' }, [csv.label])]));
+    }
     box.appendChild(tree);
 
     const selBtn = el('button', { className: 'gs-jlm-add', title: 'מוריד את הפריטים המסומנים' }, ['⬇ הורד נבחרים']);
@@ -1828,10 +1844,12 @@
     scrapeInProgress = true;
     cancelRequested = false;
     showActionButtons(ui, true);
+    const isLaw = parsed.kind === 'knesset_law';
     try {
       const selDocs = (ui.knFileCbs || []).filter(x => all || x.cb.checked).map(x => ({ ...x.doc, catLabel: x.catLabel }));
       const wantInfo = all || (ui.knInfoCb && ui.knInfoCb.checked);
-      if (!selDocs.length && !wantInfo) throw new Error('לא נבחר דבר להורדה.');
+      const selCsvs = (ui.knDataCbs || []).filter(x => all || x.cb.checked).map(x => x.csv);
+      if (!selDocs.length && !wantInfo && !selCsvs.length) throw new Error('לא נבחר דבר להורדה.');
 
       const knMod = await import(chrome.runtime.getURL('scrapers/knesset.js'));
       const csvMod = await import(chrome.runtime.getURL('lib/csv.js'));
@@ -1871,7 +1889,14 @@
         if (cancelRequested) throw new Error('בוטל על-ידי המשתמש');
       }
 
-      if (wantInfo && model.billInfoRows) entries.push({ name: 'מידע-הצעת-חוק.csv', data: csvMod.rowsToCsv(model.billInfoRows, model.billInfoFields) });
+      if (wantInfo && model.billInfoRows) entries.push({ name: isLaw ? 'מידע-חוק.csv' : 'מידע-הצעת-חוק.csv', data: csvMod.rowsToCsv(model.billInfoRows, model.billInfoFields) });
+      // Extra catalog CSVs (law pages: corrections list, secondary legislation, related bills/laws).
+      const takenCsv = [];
+      for (const csv of selCsvs) {
+        if (!csv || !Array.isArray(csv.rows) || !csv.rows.length) continue;
+        const name = uniqueNameIn(takenCsv, safeFile(csv.filename || `${csv.key || 'data'}.csv`));
+        entries.push({ name, data: csvMod.rowsToCsv(csv.rows, csv.fields) });
+      }
       if (selDocs.length) {
         const catRows = selDocs.map(d => ({ category: d.catLabel, name: d.descr, date: d.date, extension: d.ext, url: d.url }));
         entries.push({ name: 'קטלוג.csv', data: csvMod.rowsToCsv(catRows, ['category', 'name', 'date', 'extension', 'url']) });

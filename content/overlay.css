@@ -449,7 +449,32 @@
 }
 #govscraper-overlay .gs-jlm-cat:hover { color: var(--gs-primary); }
 #govscraper-overlay .gs-jlm-cat-label { flex: 1; }
-#govscraper-overlay .gs-jlm-cb { width: 16px; height: 16px; accent-color: var(--gs-primary); flex: 0 0 auto; margin: 0; cursor: pointer; }
+/* CSS-drawn checkbox (not the native control): heavy host SPAs like knesset can
+   glitch native checkbox painting inside a scrollable overlay (boxes vanish / go
+   unclickable), and host `input` rules bleed into our light-DOM overlay. Drawing
+   the box ourselves with !important is immune to both. Keeps :indeterminate for
+   the tri-state category masters (mavat / knesset). */
+#govscraper-overlay .gs-jlm-cb {
+  -webkit-appearance: none !important; appearance: none !important;
+  box-sizing: border-box !important;
+  width: 16px !important; height: 16px !important;
+  min-width: 16px !important; min-height: 16px !important;
+  margin: 0 !important; padding: 0 !important; flex: 0 0 auto;
+  border: 1.5px solid var(--gs-primary-200) !important; border-radius: 4px !important;
+  background: var(--gs-surface) !important;
+  position: relative !important; display: inline-block !important; vertical-align: middle;
+  opacity: 1 !important; visibility: visible !important; pointer-events: auto !important;
+  cursor: pointer;
+}
+#govscraper-overlay .gs-jlm-cb:checked,
+#govscraper-overlay .gs-jlm-cb:indeterminate { background: var(--gs-primary) !important; border-color: var(--gs-primary) !important; }
+#govscraper-overlay .gs-jlm-cb:checked::after {
+  content: ""; position: absolute; left: 5px; top: 2px; width: 3px; height: 7px;
+  border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); box-sizing: border-box;
+}
+#govscraper-overlay .gs-jlm-cb:indeterminate::after {
+  content: ""; position: absolute; left: 3px; top: 6px; width: 8px; height: 2px; background: #fff;
+}
 #govscraper-overlay .gs-jlm-caret {
   background: transparent; border: none; color: var(--gs-text-muted);
   cursor: pointer; font-size: 12px; padding: 0 4px; font-family: inherit; flex: 0 0 auto;
