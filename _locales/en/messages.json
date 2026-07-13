@@ -3,7 +3,7 @@
     "message": "לץ הממשל — Israeli Gov Data Downloader"
   },
   "extDescription": {
-    "message": "Detects & downloads Israeli gov open data — gov.il, Nadlan, GovMap, Mavat, IDF, geo.mot, Jerusalem licensing. In-browser."
+    "message": "Downloads Israeli gov open data in-browser: gov.il, Nadlan, GovMap, Mavat, IDF, geo.mot, Jerusalem, Knesset, Land Authority."
   },
   "overlayTitle": {
     "message": "Dataset detected"

@@ -275,6 +275,7 @@ const SITES = [
   { id: 'mot', name: 'חצב — משרד התחבורה' },
   { id: 'jlm', name: 'עיריית ירושלים — רישוי בנייה' },
   { id: 'knesset', name: 'מאגר החקיקה הלאומי — הכנסת' },
+  { id: 'land', name: 'רשות מקרקעי ישראל — איתור תוכניות (תב"ע)' },
 ];
 
 async function getDisabledSites() {
