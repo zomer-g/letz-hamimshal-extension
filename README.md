@@ -16,7 +16,7 @@ When you visit a page on:
 
 …a floating banner appears in the bottom-right, offering to download the whole dataset as a CSV (or a ZIP with the source files / GeoJSON).
 
-For **רמ"י — איתור תוכניות** specifically: after you run a search (locality / block-parcel / plan number), the banner shows the full list of matching plans — collected past the site's 150-result cap by subdividing the query — with a filter and per-plan checkboxes, so you can download **all** the plans or just the ones you pick, either as a lightweight CSV index (with direct file links) or as a ZIP of every document, organized in a folder per plan.
+For **רמ"י — איתור תוכניות** specifically: after you run a search (locality / block-parcel / plan number), the banner shows the matching plans in a filterable, per-plan checkbox list, so you can download **all** of them or just the ones you pick — as a lightweight CSV index (with direct file links) or a ZIP of every document, organized in a folder per plan. The site's search API caps a query at 150 results (no pagination); the extension shows those immediately, and offers an opt-in **"collect all N"** that fetches the rest by gently subdividing the query. That subdivision is deliberately conservative — plan-types chunked into ~6-per-request, a strictly sequential ~800 ms trickle, a hard request cap, and a circuit breaker that stops the moment the server starts failing — so it never behaves like a stress test against the shared government backend.
 
 ## Browser support
 
