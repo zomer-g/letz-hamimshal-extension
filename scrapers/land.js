@@ -152,7 +152,9 @@ async function postPlans(body, isCancelled) {
   // Abort with an explicit reason (a bare abort() surfaces as the confusing
   // "signal is aborted without reason"). Poll for user-cancel so Cancel is
   // responsive mid-request instead of waiting out the whole timeout.
-  const to = setTimeout(() => { try { ctrl.abort(new DOMException('timeout', 'TimeoutError')); } catch { ctrl.abort(); } }, 60000);
+  // 30s is generous for a healthy query (<5s); a longer hang means the server is
+  // rate-limiting the burst, so we'd rather abort and retry than wait it out.
+  const to = setTimeout(() => { try { ctrl.abort(new DOMException('timeout', 'TimeoutError')); } catch { ctrl.abort(); } }, 30000);
   const poll = setInterval(() => { if (isCancelled && isCancelled()) { try { ctrl.abort(new DOMException('cancelled', 'AbortError')); } catch { ctrl.abort(); } } }, 400);
   try {
     const resp = await fetch(API_URL, {
@@ -175,7 +177,7 @@ async function postPlans(body, isCancelled) {
 export async function previewSearch(criteria, { isCancelled } = {}) {
   if (isCancelled && isCancelled()) throw new Error('cancelled');
   const ctrl = new AbortController();
-  const to = setTimeout(() => { try { ctrl.abort(new DOMException('timeout', 'TimeoutError')); } catch { ctrl.abort(); } }, 60000);
+  const to = setTimeout(() => { try { ctrl.abort(new DOMException('timeout', 'TimeoutError')); } catch { ctrl.abort(); } }, 30000);
   try {
     const resp = await fetch(API_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -195,36 +197,49 @@ function fmtDate(d) {
 
 // Collect EVERY plan for the given criteria, defeating the 150 cap by
 // subdividing on planTypes (then statusDate) and merging by planId.
+// Gentle by design — this fires MANY requests at a shared government backend, so
+// it must never behave like a stress test:
+//   • Chunk the plan-types (≈6 per query) so a big locality needs ~6–10 queries,
+//     not the ~40–70 a naive binary split would make. Only a chunk that still
+//     hits the 150 cap is split further (then date-bisected as a last resort).
+//   • Strictly sequential, with a real pace between queries (a trickle).
+//   • Circuit breaker: after a few consecutive failures, STOP — the server is
+//     struggling and hammering it makes things worse. Return partial + warn.
+//   • Hard query cap as a final backstop.
 export async function collectAllPlans(criteria, { onProgress, isCancelled } = {}) {
   const out = new Map();
   let queries = 0;
-  let failedBuckets = 0; // buckets abandoned after all retries → results may be partial
-  const MAX_QUERIES = 500; // safety backstop against a pathological split
-  const MIN_SPAN_MS = 40 * 86400000; // ~40 days — stop bisecting below this
+  let failedBuckets = 0;   // buckets abandoned after retries → results may be partial
+  let consecFails = 0;     // consecutive failures → circuit breaker
+  let tripped = false;     // circuit opened: stop making requests
+  const CHUNK = 6;                 // plan-types per query
+  const MAX_QUERIES = 120;         // hard backstop
+  const MAX_CONSEC_FAILS = 3;      // open the circuit after this many in a row
+  const PACE_MS = 800;             // trickle between queries
+  const MIN_SPAN_MS = 40 * 86400000; // ~40 days — stop date-bisecting below this
 
   const report = () => onProgress?.({
     phase: 'scrape', current: out.size, total: 0,
     message: `אוסף תוכניות… ${out.size}`,
-    sub: `${queries} שאילתות${failedBuckets ? ` • ${failedBuckets} נסיונות חוזרים` : ''}`,
+    sub: `${queries} שאילתות${failedBuckets ? ` • ${failedBuckets} כשלים` : ''}`,
   });
   const addAll = (plans) => { for (const p of plans) if (p && p.planId != null) out.set(p.planId, p); report(); };
+  const stop = () => tripped || queries >= MAX_QUERIES;
 
-  // One query, retried with jittered backoff and self-paced so a burst of
-  // subdivision requests doesn't trip the server's rate limit (which otherwise
-  // hangs a request until our timeout aborts it). Returns the plan array, or
-  // null if the bucket ultimately failed (counted, not fatal). User-cancel is
-  // never retried — it rethrows immediately.
+  // One query, retried a little with jittered backoff, self-paced. Returns the
+  // plan array, or null if the bucket ultimately failed. User-cancel rethrows.
   async function run(planTypes, fromD, toD) {
-    if (queries >= MAX_QUERIES) return null;
+    if (stop()) return null;
     queries++;
     const body = { ...baseBody(criteria), planTypes: planTypes || [], planTypesUsed: !!planTypes, fromStatusDate: fromD || '', toStatusDate: toD || '' };
     let lastErr;
-    for (let n = 0; n < 4; n++) {
+    for (let n = 0; n < 3; n++) {
       if (isCancelled && isCancelled()) throw new Error('cancelled');
-      if (n > 0) await sleep(800 * (2 ** (n - 1)) + Math.floor(Math.random() * 500)); // 0.8s, 1.6s, 3.2s backoff
+      if (n > 0) await sleep(1000 * (2 ** (n - 1)) + Math.floor(Math.random() * 500)); // 1s, 2s backoff
       try {
         const plans = await postPlans(body, isCancelled);
-        await sleep(120); // gentle pacing between successful queries
+        consecFails = 0;
+        await sleep(PACE_MS); // trickle between successful queries
         return plans;
       } catch (e) {
         if (isCancelled && isCancelled()) throw new Error('cancelled');
@@ -232,16 +247,18 @@ export async function collectAllPlans(criteria, { onProgress, isCancelled } = {}
       }
     }
     failedBuckets++;
+    consecFails++;
+    if (consecFails >= MAX_CONSEC_FAILS) { tripped = true; console.warn('[GovScraper] land: circuit breaker tripped — server appears overloaded, stopping.'); }
     report();
     console.warn('[GovScraper] land: bucket failed after retries', { planTypes, fromD, toD, err: String(lastErr) });
-    return null; // give up on this bucket; keep the rest
+    return null;
   }
 
   async function dateBisect(planTypes, from, to) {
     if (isCancelled && isCancelled()) throw new Error('cancelled');
-    if (queries >= MAX_QUERIES) return;
+    if (stop()) return;
     const plans = await run(planTypes, fmtDate(from), fmtDate(to));
-    if (plans == null) return; // failed bucket — skip
+    if (plans == null) return;
     if (plans.length < PAGE_CAP || (to - from) <= MIN_SPAN_MS) { addAll(plans); return; }
     const mid = new Date((+from + +to) / 2);
     await dateBisect(planTypes, from, mid);
@@ -250,24 +267,29 @@ export async function collectAllPlans(criteria, { onProgress, isCancelled } = {}
 
   async function collect(planTypes) {
     if (isCancelled && isCancelled()) throw new Error('cancelled');
-    if (queries >= MAX_QUERIES) return;
+    if (stop()) return;
     const plans = await run(planTypes, '', '');
-    if (plans == null) return; // failed bucket — skip
+    if (plans == null) return;
     if (plans.length < PAGE_CAP) { addAll(plans); return; }
     if (planTypes && planTypes.length > 1) {
       const m = Math.ceil(planTypes.length / 2);
       await collect(planTypes.slice(0, m));
       await collect(planTypes.slice(m));
     } else {
-      // A single plan type still hit the cap → bisect by status date.
       await dateBisect(planTypes, new Date(1948, 0, 1), new Date(new Date().getFullYear() + 1, 0, 1));
     }
   }
 
   const startTypes = Array.isArray(criteria.planTypes) && criteria.planTypes.length ? criteria.planTypes.slice() : DEFAULT_PLAN_TYPES.slice();
-  await collect(startTypes);
+  // Start from small type-chunks (few queries, little waste) — only chunks that
+  // still hit the cap get split further.
+  for (let i = 0; i < startTypes.length && !stop(); i += CHUNK) {
+    await collect(startTypes.slice(i, i + CHUNK));
+  }
   const arr = [...out.values()];
-  arr.incompleteQueries = failedBuckets; // surfaced by the overlay as a warning
+  // Partial if we tripped the breaker, hit the cap, or abandoned any bucket.
+  arr.incompleteQueries = failedBuckets + (tripped ? 1 : 0);
+  arr.serverOverloaded = tripped;
   return arr;
 }
 

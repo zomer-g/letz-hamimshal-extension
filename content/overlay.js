@@ -2008,12 +2008,13 @@
       }
       body.appendChild(el('div', { className: 'gs-jlm-note' }, ['מפת התוכנית (קישור לאתר המפות הממשלתי) נשמרת באינדקס ה-CSV; היא אינה קובץ ולכן אינה נכללת ב-ZIP.']));
 
-      // The plan list + its download buttons render here after "load list".
+      // Render the plan list IMMEDIATELY from the sample the search already
+      // returned (one reliable query). If the search is capped at 150, the list
+      // offers an opt-in "collect all" that subdivides past the cap — kept
+      // optional because that burst of queries can strain the site's server.
       const listWrap = el('div', {}, []);
       body.appendChild(listWrap);
-      const loadBtn = el('button', { className: 'gs-jlm-add gs-jlm-add-on', title: 'אוסף את כל התוכניות בחיפוש (עוקף את מגבלת 150 של האתר) ומציג רשימה לבחירה' }, [`📋 הצג רשימת תוכניות (${totalGuess.toLocaleString('he-IL')})`]);
-      loadBtn.addEventListener('click', () => runLandLoadList({ match, ui, listWrap, loadBtn }));
-      body.appendChild(loadBtn);
+      renderLandPlanList({ match, ui, listWrap, plans: sample, landMod, capped, total: totalGuess, criteria });
     };
 
     await render();
@@ -2023,49 +2024,57 @@
     }, 1500);
   }
 
-  // Collect EVERY plan for the current search (subdivided past 150), then render
-  // a selectable list so the user can download all of them or just some.
-  async function runLandLoadList({ match, ui, listWrap, loadBtn }) {
+  // Collect EVERY plan for the current search (subdivides past the 150 cap),
+  // then re-render the list with the full set. Opt-in from the list, because the
+  // burst of subdivision queries can strain the site's server; on failure it
+  // degrades to whatever it managed to gather + a clear warning.
+  async function runLandCollectAll({ match, ui, listWrap, criteria }) {
     if (scrapeInProgress) { try { setStatus(ui.progress, 'פעולה כבר פועלת — המתן/י לסיום או לחצ/י בטל.', 'info'); } catch {} return; }
     scrapeInProgress = true;
     cancelRequested = false;
     showActionButtons(ui, true);
-    loadBtn.disabled = true;
     try {
       const landMod = await import(chrome.runtime.getURL('scrapers/land.js'));
-      const criteria = landMod.readSearchCriteria();
-      if (!criteria) throw new Error('לא זוהה חיפוש פעיל. בצע/י חיפוש בעמוד ונסה/י שוב.');
       setProgress(ui.progress, { current: 0, total: 0, message: 'אוסף את כל התוכניות…' });
       const plans = await landMod.collectAllPlans(criteria, {
         onProgress: (p) => setProgress(ui.progress, p),
         isCancelled: () => cancelRequested,
       });
       if (cancelRequested) throw new Error('בוטל על-ידי המשתמש');
-      if (!plans.length) throw new Error('לא נמצאו תוכניות עבור החיפוש הנוכחי.');
-      ui.landPlans = plans;
-      loadBtn.style.display = 'none';
-      if (plans.incompleteQueries) {
-        setStatus(ui.progress, `נאספו ${plans.length} תוכניות — חלק מהשאילתות נכשלו, ייתכן חוסר. נסה/י שוב לכיסוי מלא.`, 'error');
+      if (!plans.length) throw new Error('לא נאספו תוכניות — ייתכן שהשרת עמוס כרגע. המתן/י מעט ונסה/י שוב.');
+      if (plans.serverOverloaded) {
+        setStatus(ui.progress, `נאספו ${plans.length} תוכניות בלבד — השרת החל להחזיר שגיאות והעצירה יזומה כדי לא להעמיס עליו. המתן/י מעט ונסה/י שוב לכיסוי מלא.`, 'error');
+      } else if (plans.incompleteQueries) {
+        setStatus(ui.progress, `נאספו ${plans.length} תוכניות — חלק מהשאילתות נכשלו, ייתכן חוסר. אפשר לנסות שוב.`, 'error');
       } else {
         ui.progress.style.display = 'none';
       }
-      renderLandPlanList({ match, ui, listWrap, plans, landMod });
+      renderLandPlanList({ match, ui, listWrap, plans, landMod, capped: false, total: plans.length, criteria });
     } catch (e) {
-      console.error('[GovScraper] land load-list failed:', e);
-      setStatus(ui.progress, `טעינת הרשימה נכשלה: ${errMsg(e)}`, 'error');
-      loadBtn.disabled = false;
+      console.error('[GovScraper] land collect-all failed:', e);
+      setStatus(ui.progress, `איסוף כל התוכניות נכשל: ${errMsg(e)}`, 'error');
     } finally {
       scrapeInProgress = false;
       showActionButtons(ui, false);
     }
   }
 
-  // Render the collected plans as a scrollable, filterable checkbox list with a
-  // select-all master + live count, plus the CSV-index / full-ZIP buttons that
-  // act on the CHECKED plans.
-  function renderLandPlanList({ match, ui, listWrap, plans, landMod }) {
+  // Render plans as a scrollable, filterable checkbox list with a select-all
+  // master + live count, plus the CSV-index / full-ZIP buttons that act on the
+  // CHECKED plans. When `capped`, prepends an opt-in "collect all N" button.
+  function renderLandPlanList({ match, ui, listWrap, plans, landMod, capped, total, criteria }) {
     listWrap.replaceChildren();
+    ui.landPlans = plans;
     const allKeys = landMod.DOC_TYPES.map(t => t.key);
+
+    if (capped) {
+      listWrap.appendChild(el('div', { className: 'gs-jlm-note' }, [
+        `מוצגות ${plans.length} מתוך כ-${(total || plans.length).toLocaleString('he-IL')} תוכניות (מגבלת האתר). אפשר להוריד את המוצגות, או לאסוף את כולן:`,
+      ]));
+      const allBtn = el('button', { className: 'gs-jlm-add', title: 'אוסף את כל התוכניות בחיפוש (עוקף את מגבלת 150 — עשוי לקחת זמן, ולעיתים חלקי אם השרת עמוס)' }, [`⤓ אסוף את כל ${(total || plans.length).toLocaleString('he-IL')} התוכניות`]);
+      allBtn.addEventListener('click', () => runLandCollectAll({ match, ui, listWrap, criteria }));
+      listWrap.appendChild(allBtn);
+    }
 
     // Controls: select-all master + live count.
     const selAll = el('input', { type: 'checkbox', class: 'gs-jlm-cb' });
