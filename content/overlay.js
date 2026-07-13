@@ -183,10 +183,11 @@
     // renders a per-file download/favorite picker inside the box.
     const isJlm = parsed.kind === 'jlm_tik' || parsed.kind === 'jlm_list' || parsed.kind === 'jlm_home';
     const isKnesset = parsed.kind === 'knesset_bill' || parsed.kind === 'knesset_law';
-    const jlmBox = (isJlm || isKnesset) ? el('div', { className: 'gs-jlm' }, []) : null;
+    const isLand = parsed.kind === 'land_plans';
+    const jlmBox = (isJlm || isKnesset || isLand) ? el('div', { className: 'gs-jlm' }, []) : null;
     // These sites drive downloads from buttons inside the box (category tree /
-    // per-file / per-tik), so there is no single primary button.
-    const jlmNoPrimary = isJlm || isKnesset;
+    // per-file / per-tik / per-search), so there is no single primary button.
+    const jlmNoPrimary = isJlm || isKnesset || isLand;
 
     const labels = downloadLabelsForKind(parsed.kind);
     const downloadBtn = el('button', {
@@ -351,6 +352,7 @@
       case 'jlm_home': return 'עיריית ירושלים';
       case 'knesset_bill': return 'הצעת חוק (הכנסת)';
       case 'knesset_law': return 'חוק (הכנסת)';
+      case 'land_plans': return 'איתור תוכניות (רמ"י)';
       default: return kind;
     }
   }
@@ -1009,6 +1011,11 @@
     // מאגר החקיקה (הכנסת): render the protocols/documents (bill) or amendments (law) tree.
     if (match.parsed.kind === 'knesset_bill' || match.parsed.kind === 'knesset_law') {
       initKnesset({ match, ui });
+    }
+    // רשות מקרקעי ישראל — איתור תוכניות: watch for a search, then offer
+    // CSV-index / full-ZIP over ALL its results (subdivided past the 150 cap).
+    if (match.parsed.kind === 'land_plans') {
+      initLand({ match, ui });
     }
 
     // Triggered from the popup ("download without the floating window"): for
@@ -1918,6 +1925,318 @@
     } catch (e) {
       console.error('[GovScraper] knesset download failed:', e);
       setStatus(ui.progress, `ההורדה נכשלה: ${errMsg(e)}`, 'error');
+    } finally {
+      scrapeInProgress = false;
+      showActionButtons(ui, false);
+    }
+  }
+
+  // --- רשות מקרקעי ישראל — איתור תוכניות (תב"ע) ------------------------------
+
+  // The search lives only in the Angular form (content/land-inject.js captures
+  // its request body to a DOM bridge). We poll that bridge; once a search
+  // exists, we show a quick preview + document-type picker and two outputs:
+  // a lightweight CSV index, or the full file ZIP. Both cover EVERY result —
+  // collectAllPlans subdivides past the site's 150-row cap.
+  async function initLand({ match, ui }) {
+    const box = ui.jlmBox;
+    if (!box) return;
+    let landMod;
+    try { landMod = await import(chrome.runtime.getURL('scrapers/land.js')); }
+    catch (e) { box.appendChild(el('div', { className: 'gs-jlm-note' }, [`טעינת הסקרייפר נכשלה: ${errMsg(e)}`])); return; }
+
+    box.replaceChildren();
+    box.appendChild(el('div', { className: 'gs-jlm-sec-title' }, ['⬇ הורדת תוצאות חיפוש — איתור תוכניות (רמ"י)']));
+    const status = el('div', { className: 'gs-jlm-note' }, ['בצע/י חיפוש בעמוד (יישוב / גוש־חלקה / מספר תוכנית) — כאן תופיע אפשרות להציג את התוכניות ולבחור אילו להוריד.']);
+    box.appendChild(status);
+    const body = el('div', {}, []);
+    box.appendChild(body);
+
+    ui.landTypeCbs = [];
+    ui.landPlans = null;
+    ui.landPlanCbs = [];
+    let lastKey = null;
+
+    const render = async () => {
+      const criteria = landMod.readSearchCriteria();
+      if (!criteria) { body.replaceChildren(); return; } // no search yet — keep the hint
+      const key = JSON.stringify(criteria);
+      if (key === lastKey) return; // unchanged search → keep the user's picker/selection
+      lastKey = key;
+      ui.landPlans = null; ui.landPlanCbs = []; // new search → drop any loaded list
+
+      status.textContent = 'טוען תצוגה מקדימה של החיפוש…';
+      body.replaceChildren();
+      let preview;
+      try { preview = await landMod.previewSearch(criteria); }
+      catch (e) { status.textContent = `טעינת החיפוש נכשלה: ${errMsg(e)}`; return; }
+
+      const sample = preview.plans || [];
+      const total = preview.totalRecords;
+      if (!sample.length && !total) { status.textContent = 'לא נמצאו תוצאות לחיפוש הנוכחי.'; return; }
+
+      const totalGuess = total != null ? total : sample.length;
+      const capped = (total != null && total > sample.length) || sample.length >= 150;
+      status.textContent = total != null
+        ? `נמצאו כ-${total.toLocaleString('he-IL')} תוכניות בחיפוש הנוכחי.`
+        : `נמצאו ${sample.length} תוכניות בחיפוש הנוכחי.`;
+
+      if (capped) {
+        body.appendChild(el('div', { className: 'gs-jlm-note' }, [
+          'האתר מציג עד 150 תוצאות בלבד — "הצג רשימת תוכניות" יאסוף את כולן (חלוקת שאילתות לפי סיווג/תאריך) כדי שתוכל/י לבחור.',
+        ]));
+      }
+
+      // Document-type picker (counts are from the 150-plan sample, as a hint).
+      const sampleCount = (key2, single) => sample.reduce((n, p) => {
+        const v = p.documentsSet && p.documentsSet[key2];
+        return n + (single ? (v && v.path ? 1 : 0) : (Array.isArray(v) ? v.length : 0));
+      }, 0);
+      body.appendChild(el('div', { className: 'gs-jlm-group' }, ['סוגי מסמכים להורדה']));
+      ui.landTypeCbs = [];
+      for (const t of landMod.DOC_TYPES) {
+        const single = t.key === 'takanon' || t.key === 'mmg';
+        const cb = el('input', { type: 'checkbox', class: 'gs-jlm-cb' });
+        cb.checked = true;
+        cb.dataset.key = t.key;
+        ui.landTypeCbs.push(cb);
+        const n = sampleCount(t.key, single);
+        body.appendChild(el('label', { className: 'gs-jlm-cat' }, [
+          cb, el('span', { className: 'gs-jlm-cat-label' }, [t.label]),
+          el('span', { className: 'gs-jlm-count' }, [n ? `(מדגם: ${n})` : '(אין במדגם)']),
+        ]));
+      }
+      body.appendChild(el('div', { className: 'gs-jlm-note' }, ['מפת התוכנית (קישור לאתר המפות הממשלתי) נשמרת באינדקס ה-CSV; היא אינה קובץ ולכן אינה נכללת ב-ZIP.']));
+
+      // The plan list + its download buttons render here after "load list".
+      const listWrap = el('div', {}, []);
+      body.appendChild(listWrap);
+      const loadBtn = el('button', { className: 'gs-jlm-add gs-jlm-add-on', title: 'אוסף את כל התוכניות בחיפוש (עוקף את מגבלת 150 של האתר) ומציג רשימה לבחירה' }, [`📋 הצג רשימת תוכניות (${totalGuess.toLocaleString('he-IL')})`]);
+      loadBtn.addEventListener('click', () => runLandLoadList({ match, ui, listWrap, loadBtn }));
+      body.appendChild(loadBtn);
+    };
+
+    await render();
+    const iv = setInterval(() => {
+      if (!document.getElementById('govscraper-overlay')) { clearInterval(iv); return; }
+      if (!scrapeInProgress) render();
+    }, 1500);
+  }
+
+  // Collect EVERY plan for the current search (subdivided past 150), then render
+  // a selectable list so the user can download all of them or just some.
+  async function runLandLoadList({ match, ui, listWrap, loadBtn }) {
+    if (scrapeInProgress) { try { setStatus(ui.progress, 'פעולה כבר פועלת — המתן/י לסיום או לחצ/י בטל.', 'info'); } catch {} return; }
+    scrapeInProgress = true;
+    cancelRequested = false;
+    showActionButtons(ui, true);
+    loadBtn.disabled = true;
+    try {
+      const landMod = await import(chrome.runtime.getURL('scrapers/land.js'));
+      const criteria = landMod.readSearchCriteria();
+      if (!criteria) throw new Error('לא זוהה חיפוש פעיל. בצע/י חיפוש בעמוד ונסה/י שוב.');
+      setProgress(ui.progress, { current: 0, total: 0, message: 'אוסף את כל התוכניות…' });
+      const plans = await landMod.collectAllPlans(criteria, {
+        onProgress: (p) => setProgress(ui.progress, p),
+        isCancelled: () => cancelRequested,
+      });
+      if (cancelRequested) throw new Error('בוטל על-ידי המשתמש');
+      if (!plans.length) throw new Error('לא נמצאו תוכניות עבור החיפוש הנוכחי.');
+      ui.landPlans = plans;
+      loadBtn.style.display = 'none';
+      if (plans.incompleteQueries) {
+        setStatus(ui.progress, `נאספו ${plans.length} תוכניות — חלק מהשאילתות נכשלו, ייתכן חוסר. נסה/י שוב לכיסוי מלא.`, 'error');
+      } else {
+        ui.progress.style.display = 'none';
+      }
+      renderLandPlanList({ match, ui, listWrap, plans, landMod });
+    } catch (e) {
+      console.error('[GovScraper] land load-list failed:', e);
+      setStatus(ui.progress, `טעינת הרשימה נכשלה: ${errMsg(e)}`, 'error');
+      loadBtn.disabled = false;
+    } finally {
+      scrapeInProgress = false;
+      showActionButtons(ui, false);
+    }
+  }
+
+  // Render the collected plans as a scrollable, filterable checkbox list with a
+  // select-all master + live count, plus the CSV-index / full-ZIP buttons that
+  // act on the CHECKED plans.
+  function renderLandPlanList({ match, ui, listWrap, plans, landMod }) {
+    listWrap.replaceChildren();
+    const allKeys = landMod.DOC_TYPES.map(t => t.key);
+
+    // Controls: select-all master + live count.
+    const selAll = el('input', { type: 'checkbox', class: 'gs-jlm-cb' });
+    selAll.checked = true;
+    const countLbl = el('span', { className: 'gs-jlm-count' }, ['']);
+    listWrap.appendChild(el('label', { className: 'gs-jlm-cat' }, [
+      selAll, el('span', { className: 'gs-jlm-cat-label' }, ['בחר/נקה הכל']), countLbl,
+    ]));
+
+    // Free-text filter (plan number / locality / essence).
+    const filter = el('input', { type: 'text', class: 'gs-land-filter', placeholder: 'סינון לפי מספר תוכנית / יישוב / מהות…' });
+    filter.style.cssText = 'width:100%;box-sizing:border-box;margin:2px 0 6px;padding:4px 6px;font-size:12px;';
+    listWrap.appendChild(filter);
+
+    const listEl = el('div', { className: 'gs-jlm-tree' }, []);
+    listEl.style.cssText = 'max-height:260px;overflow-y:auto';
+    ui.landPlanCbs = [];
+    const rows = [];
+    for (const p of plans) {
+      const cb = el('input', { type: 'checkbox', class: 'gs-jlm-cb' });
+      cb.checked = true;
+      const nFiles = landMod.planFiles(p, allKeys).filter(f => landMod.isDownloadableUrl(f.url)).length;
+      const label = [p.planNumber || '—', p.cityText || '', p.mahut || ''].filter(Boolean).join(' · ');
+      const titleTxt = `${label}${p.status ? '\n' + p.status : ''}${p.statusDate ? ' · ' + String(p.statusDate).trim() : ''}`;
+      const row = el('label', { className: 'gs-jlm-leaf', title: titleTxt }, [
+        cb, el('span', {}, [label]), el('span', { className: 'gs-jlm-count' }, [`(${nFiles})`]),
+      ]);
+      cb.addEventListener('change', updateCount);
+      listEl.appendChild(row);
+      ui.landPlanCbs.push({ planId: p.planId, cb, plan: p });
+      rows.push({ row, cb, text: label.toLowerCase() });
+    }
+    listWrap.appendChild(listEl);
+
+    function updateCount() {
+      const on = ui.landPlanCbs.filter(x => x.cb.checked).length;
+      countLbl.textContent = `נבחרו ${on} מתוך ${plans.length}`;
+      selAll.checked = on === plans.length;
+      selAll.indeterminate = on > 0 && on < plans.length;
+    }
+    selAll.addEventListener('change', () => {
+      for (const x of ui.landPlanCbs) x.cb.checked = selAll.checked;
+      updateCount();
+    });
+    filter.addEventListener('input', () => {
+      const term = filter.value.trim().toLowerCase();
+      for (const r of rows) r.row.style.display = (!term || r.text.includes(term)) ? '' : 'none';
+    });
+    updateCount();
+
+    const csvBtn = el('button', { className: 'gs-jlm-add', title: 'מוריד CSV עם התוכניות שנבחרו והקבצים שלהן (כולל קישורים ישירים) — מהיר, בלי להוריד את הקבצים עצמם' }, ['⬇ אינדקס CSV (נבחרים)']);
+    csvBtn.addEventListener('click', () => runLandDownload({ match, ui, mode: 'csv' }));
+    const zipBtn = el('button', { className: 'gs-jlm-add gs-jlm-add-on', title: 'מוריד את כל הקבצים של התוכניות שנבחרו, בתיקייה לכל תוכנית, + אינדקס CSV' }, ['⬇ הורד קבצים (ZIP, נבחרים)']);
+    zipBtn.addEventListener('click', () => runLandDownload({ match, ui, mode: 'zip' }));
+    listWrap.appendChild(el('div', { className: 'gs-jlm-btns' }, [csvBtn, zipBtn]));
+  }
+
+  async function runLandDownload({ match, ui, mode }) {
+    if (scrapeInProgress) { try { setStatus(ui.progress, 'הורדה כבר פועלת — המתן/י לסיום או לחצ/י בטל.', 'info'); } catch {} return; }
+    scrapeInProgress = true;
+    cancelRequested = false;
+    const { scraper, parsed } = match;
+    showActionButtons(ui, true);
+    try {
+      const landMod = await import(chrome.runtime.getURL('scrapers/land.js'));
+      const csvMod = await import(chrome.runtime.getURL('lib/csv.js'));
+      const zipMod = await import(chrome.runtime.getURL('lib/zip.js'));
+
+      const criteria = landMod.readSearchCriteria();
+      if (!criteria) throw new Error('לא זוהה חיפוש פעיל. בצע/י חיפוש בעמוד ונסה/י שוב.');
+      const types = (ui.landTypeCbs || []).filter(cb => cb.checked).map(cb => cb.dataset.key);
+      if (!types.length) throw new Error('בחר/י לפחות סוג מסמך אחד.');
+
+      // Use the plans the user selected from the loaded list. If the list wasn't
+      // loaded (shouldn't happen — buttons live inside it), fall back to
+      // collecting everything.
+      let plans;
+      if (Array.isArray(ui.landPlans)) {
+        plans = (ui.landPlanCbs || []).filter(x => x.cb.checked).map(x => x.plan);
+        if (!plans.length) throw new Error('לא נבחרה אף תוכנית. סמנ/י תוכניות ברשימה.');
+      } else {
+        setProgress(ui.progress, { current: 0, total: 0, message: 'אוסף את כל התוכניות…' });
+        plans = await landMod.collectAllPlans(criteria, { onProgress: (p) => setProgress(ui.progress, p), isCancelled: () => cancelRequested });
+        if (cancelRequested) throw new Error('בוטל על-ידי המשתמש');
+        if (!plans.length) throw new Error('לא נמצאו תוכניות עבור החיפוש הנוכחי.');
+      }
+
+      const date = new Date().toISOString().slice(0, 10);
+      const base = sanitizeFilename(`land_${[criteria.planNumber, criteria.city != null && criteria.city !== '' ? 'city' + criteria.city : '', criteria.gush ? 'gush' + criteria.gush : ''].filter(Boolean).join('_') || 'plans'}`);
+      const indexCsv = csvMod.rowsToCsv(landMod.plansToRows(plans), landMod.indexFields());
+      const fileRows = landMod.plansToFileRows(plans, types);
+      const filesCsv = csvMod.rowsToCsv(fileRows, landMod.fileIndexFields());
+
+      // --- CSV index mode: just the two catalogs, no file bytes. ---
+      if (mode === 'csv') {
+        setStatus(ui.progress, `אורז אינדקס (${plans.length} תוכניות, ${fileRows.length} קבצים)…`, 'info');
+        const entries = [
+          { name: 'תוכניות.csv', data: indexCsv },
+          { name: 'קבצים.csv', data: filesCsv },
+        ];
+        const blob = await zipMod.buildZip(entries);
+        const filename = `${base}_index_${date}.zip`;
+        const url = URL.createObjectURL(blob);
+        const resp = await chrome.runtime.sendMessage({ type: 'package-and-download', payload: { kind: 'blob-url', filename, url, sizeBytes: blob.size } });
+        if (!resp?.ok) throw new Error(resp?.error || 'ההורדה נכשלה');
+        setTimeout(() => URL.revokeObjectURL(url), 8000);
+        setStatus(ui.progress, `הסתיים — ${plans.length} תוכניות, ${fileRows.length} קבצים באינדקס`, 'done');
+        await logHistory({ scraper, parsed, result: { rows: plans, collectorName: parsed.collectorName }, filename, mode: 'land_index', attachmentCount: fileRows.length });
+        return;
+      }
+
+      // --- Full ZIP mode: download every file, folder per plan. ---
+      const attachments = landMod.plansToAttachments(plans, types);
+      if (!attachments.length) throw new Error('לא נמצאו קבצים בסוגים שנבחרו. נסה/י "אינדקס CSV" או סמן/י סוגי מסמכים אחרים.');
+
+      async function fetchBytesRetry(url) {
+        let lastErr;
+        for (let n = 0; n < 3; n++) {
+          if (cancelRequested) throw new Error('cancelled');
+          try { return await landMod.fetchFileBytes(url, { isCancelled: () => cancelRequested }); }
+          catch (e) { lastErr = e; await new Promise(r => setTimeout(r, 600 * (n + 1) + Math.floor(Math.random() * 500))); }
+        }
+        throw lastErr;
+      }
+
+      const MAX_FILES_PER_PART = 250; // bounds peak memory per ZIP part
+      const multiPart = attachments.length > MAX_FILES_PER_PART;
+      let fileIdx = 0, fileFails = 0, okCount = 0, part = 0, prevUrl = null;
+
+      setProgress(ui.progress, { current: 0, total: attachments.length, message: 'מוריד קבצים…' });
+      for (let start = 0; start < attachments.length && !cancelRequested; start += MAX_FILES_PER_PART) {
+        const chunk = attachments.slice(start, start + MAX_FILES_PER_PART);
+        const batch = [];
+        const taken = [];
+        await pool(chunk, 4, async (att) => {
+          if (cancelRequested) return;
+          try {
+            const bytes = await fetchBytesRetry(att.url);
+            batch.push({ name: uniqueNameIn(taken, att.filename), data: bytes });
+            okCount++;
+          } catch { fileFails++; }
+          finally {
+            fileIdx++;
+            setProgress(ui.progress, { current: fileIdx, total: attachments.length, message: 'מוריד קבצים', sub: `${fileIdx}/${attachments.length}${multiPart ? ` • חלק ${part + 1}` : ''}${fileFails ? ` • ${fileFails} כשלים` : ''}` });
+          }
+        }, () => cancelRequested);
+        if (!batch.length) continue;
+        part++;
+        const entries = part === 1
+          ? [{ name: 'תוכניות.csv', data: indexCsv }, { name: 'קבצים.csv', data: filesCsv }, ...batch]
+          : batch;
+        setStatus(ui.progress, multiPart ? `אורז ZIP — חלק ${part} (${batch.length} קבצים)…` : `אורז ZIP (${batch.length} קבצים)…`, 'info');
+        const blob = await zipMod.buildZip(entries);
+        const filename = multiPart ? `${base}_${date}_part${String(part).padStart(2, '0')}.zip` : `${base}_${date}.zip`;
+        const url = URL.createObjectURL(blob);
+        const resp = await chrome.runtime.sendMessage({ type: 'package-and-download', payload: { kind: 'blob-url', filename, url, sizeBytes: blob.size } });
+        if (!resp?.ok) throw new Error(resp?.error || 'אריזת ה-ZIP נכשלה');
+        if (prevUrl) URL.revokeObjectURL(prevUrl);
+        prevUrl = url;
+      }
+      if (prevUrl) setTimeout(() => URL.revokeObjectURL(prevUrl), 8000);
+      if (cancelRequested) throw new Error('בוטל על-ידי המשתמש');
+      if (!part) throw new Error('לא הורד אף קובץ (ייתכן שכל ההורדות נכשלו).');
+
+      setStatus(ui.progress,
+        `הסתיים — ${plans.length} תוכניות, ${okCount} קבצים${multiPart ? ` ב-${part} קבצי ZIP` : ''}${fileFails ? ` (${fileFails} נכשלו)` : ''}`,
+        fileFails ? 'error' : 'done');
+      await logHistory({ scraper, parsed, result: { rows: plans, collectorName: parsed.collectorName }, filename: `${base} (${part} ZIP)`, mode: 'land', attachmentCount: okCount });
+    } catch (e) {
+      console.error('[GovScraper] land download failed:', e);
+      setStatus(ui.progress, `${'ההורדה נכשלה'}: ${errMsg(e)}`, 'error');
     } finally {
       scrapeInProgress = false;
       showActionButtons(ui, false);

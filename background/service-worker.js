@@ -64,6 +64,7 @@ const SENDER_HOST_ALLOWLIST = new Set([
   'geo.mot.gov.il',
   'ykpubdata.jerusalem.muni.il',
   'main.knesset.gov.il',
+  'apps.land.gov.il',
 ]);
 
 function validateSender(sender) {

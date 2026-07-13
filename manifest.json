@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "0.3.59",
+  "version": "0.3.62",
   "description": "__MSG_extDescription__",
   "default_locale": "he",
   "icons": {
@@ -36,7 +36,8 @@
     "https://*.jerusalem.muni.il/*",
     "https://main.knesset.gov.il/*",
     "https://www.knesset.gov.il/*",
-    "https://fs.knesset.gov.il/*"
+    "https://fs.knesset.gov.il/*",
+    "https://apps.land.gov.il/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'"
@@ -96,6 +97,16 @@
     },
     {
       "matches": [
+        "https://apps.land.gov.il/*"
+      ],
+      "js": [
+        "content/land-inject.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
         "https://www.gov.il/he/departments/dynamiccollectors/*",
         "https://www.gov.il/he/Departments/DynamicCollectors/*",
         "https://www.gov.il/he/collectors/*",
@@ -109,7 +120,8 @@
         "https://mavat.iplan.gov.il/*",
         "https://geo.mot.gov.il/*",
         "https://ykpubdata.jerusalem.muni.il/*",
-        "https://main.knesset.gov.il/*"
+        "https://main.knesset.gov.il/*",
+        "https://apps.land.gov.il/*"
       ],
       "js": [
         "content/browser-compat.js",
@@ -137,6 +149,8 @@
         "scrapers/mot-geometry.js",
         "scrapers/jlm.js",
         "scrapers/knesset.js",
+        "scrapers/land.js",
+        "content/land-inject.js",
         "scrapers/_content-attachments.js",
         "lib/csv.js",
         "lib/zip.js",
@@ -153,7 +167,8 @@
         "https://mavat.iplan.gov.il/*",
         "https://geo.mot.gov.il/*",
         "https://ykpubdata.jerusalem.muni.il/*",
-        "https://main.knesset.gov.il/*"
+        "https://main.knesset.gov.il/*",
+        "https://apps.land.gov.il/*"
       ]
     }
   ]

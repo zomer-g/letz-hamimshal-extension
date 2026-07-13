@@ -35,6 +35,7 @@ export const govilScraper = {
     if (!host.endsWith('gov.il')) return null;
     if (host.endsWith('nadlan.gov.il') || host.endsWith('govmap.gov.il')) return null;
     if (host.endsWith('iplan.gov.il') || host.endsWith('idf.il')) return null;
+    if (host.endsWith('land.gov.il')) return null; // apps.land.gov.il → landScraper
     if (host.endsWith('mot.gov.il')) return null;
     if (host === 'data.gov.il') return null;
 

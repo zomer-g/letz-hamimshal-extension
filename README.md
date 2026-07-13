@@ -7,8 +7,16 @@ When you visit a page on:
 - `www.gov.il` (DynamicCollector / Traditional Collector / Content Pages)
 - `www.nadlan.gov.il` (parcel deal history)
 - `www.govmap.gov.il` (WFS GIS layers)
+- `idf.il` (allowlisted document sections)
+- `mavat.iplan.gov.il` (מִנהל התכנון — plan documents)
+- `geo.mot.gov.il` (חצב — layer catalog)
+- `ykpubdata.jerusalem.muni.il` (עיריית ירושלים — building-licensing files)
+- `main.knesset.gov.il` (מאגר החקיקה הלאומי — bills & laws)
+- `apps.land.gov.il/TabaSearch` (רשות מקרקעי ישראל — איתור תוכניות / תב"ע)
 
-…a floating banner appears in the bottom-right, offering to download the whole dataset as a CSV (or ZIP for GovMap layers with GeoJSON).
+…a floating banner appears in the bottom-right, offering to download the whole dataset as a CSV (or a ZIP with the source files / GeoJSON).
+
+For **רמ"י — איתור תוכניות** specifically: after you run a search (locality / block-parcel / plan number), the banner shows the full list of matching plans — collected past the site's 150-result cap by subdividing the query — with a filter and per-plan checkboxes, so you can download **all** the plans or just the ones you pick, either as a lightweight CSV index (with direct file links) or as a ZIP of every document, organized in a folder per plan.
 
 ## Browser support
 
@@ -55,7 +63,7 @@ Each suite is also runnable on its own, e.g. `node tests/dispatch.test.mjs`. Cov
 
 | Suite | What it pins |
 |-------|--------------|
-| `dispatch.test.mjs` | URL → scraper routing for all 5 scrapers + registry ordering |
+| `dispatch.test.mjs` | URL → scraper routing across all scrapers + registry ordering (catch-all last) |
 | `csv.test.mjs` | RFC-4180 escaping, utf-8-sig BOM, value formatting |
 | `zip.test.mjs` | ZIP STORE round-trip, CRC-32, Hebrew UTF-8 + CP862 filenames |
 | `govil-transform.test.mjs` | item/total extraction, row flattening, attachment discovery, ng-init parse |
