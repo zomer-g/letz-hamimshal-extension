@@ -27,7 +27,9 @@ const outName = TARGET === 'firefox' ? `extension-firefox-v${version}.zip` : `ex
 
 // Transform the Chrome manifest into a Firefox-compatible one:
 //   - background service worker → event-page background script (FF MV3)
-//   - add browser_specific_settings.gecko (required by AMO)
+//   - add browser_specific_settings.gecko (required by AMO), incl. the
+//     data_collection_permissions consent key AMO now requires of new add-ons
+//     ("none" — nothing leaves the browser except the user's own downloads)
 // Everything else (MV3, world:"MAIN" content scripts [FF 128+], DNR, WAR,
 // permissions, _locales) is identical.
 function toFirefoxManifest(mf) {
@@ -36,7 +38,13 @@ function toFirefoxManifest(mf) {
     m.background = { scripts: [m.background.service_worker] };
   }
   m.browser_specific_settings = {
-    gecko: { id: 'govscraper@z-g.co.il', strict_min_version: '128.0' },
+    gecko: {
+      id: 'govscraper@z-g.co.il',
+      // 128 is what world:"MAIN" content scripts need; 140 is what
+      // data_collection_permissions needs. 140 is the current ESR.
+      strict_min_version: '140.0',
+      data_collection_permissions: { required: ['none'] },
+    },
   };
   return m;
 }
