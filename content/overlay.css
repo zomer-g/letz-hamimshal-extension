@@ -310,6 +310,23 @@
   color: var(--gs-text-muted);
 }
 
+/* govmap limitations note (centroid-only geometry) + OVER link.
+   !important on the link colors — host sites force `a{color:!important}`. */
+#govscraper-overlay .gs-govmap-note {
+  padding-top: 8px;
+  border-top: 1px solid var(--gs-primary-100);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--gs-text-muted);
+}
+#govscraper-overlay .gs-govmap-over-link {
+  color: var(--gs-primary) !important;
+  text-decoration: none !important;
+  font-weight: 600;
+  white-space: nowrap;
+}
+#govscraper-overlay .gs-govmap-over-link:hover { text-decoration: underline !important; }
+
 #govscraper-overlay .gs-buttons {
   display: flex;
   flex-wrap: wrap;

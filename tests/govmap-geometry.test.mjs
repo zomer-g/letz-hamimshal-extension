@@ -103,6 +103,28 @@ test('fetchGeometry retries transient failures then succeeds', async () => {
   assertEqual(geom.type, 'Polygon');
 });
 
+// ---- circuit breaker (2026-07-17: entities-geometry serves the SPA shell) ----
+
+test('HTML shell response trips the breaker: centroid fallback, no further calls', async () => {
+  __test__._setGeomEndpointDead(false);
+  calls.length = 0;
+  responder = () => ({
+    ok: true, status: 200,
+    headers: { get: (h) => (h === 'content-type' ? 'text/html; charset=utf-8' : null) },
+    json: async () => { throw new Error('not json'); },
+  });
+  const e1 = { objectId: 31, centroid: [3900000, 3700000] };
+  await ensureGeometry('21', e1);
+  assertEqual(e1.geom, 'POINT(3900000 3700000)');
+  assertEqual(e1.gsCentroidOnly, true);
+  assertEqual(calls.length, 1); // no retries on the SPA shell — breaker trips at once
+  const e2 = { objectId: 32, centroid: [3900001, 3700001] };
+  await ensureGeometry('21', e2);
+  assertEqual(calls.length, 1); // breaker: second entity makes NO geometry request
+  assertEqual(e2.geom, 'POINT(3900001 3700001)');
+  __test__._setGeomEndpointDead(false);
+});
+
 // ---- WGS84 output (2026-07-08 decision) --------------------------------------
 
 test('entityToParts: geometry is WGS84 lon/lat, not ITM', () => {

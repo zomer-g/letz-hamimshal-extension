@@ -269,7 +269,14 @@ async function saveJlmCats() {
 const SITES = [
   { id: 'govil', name: 'gov.il — מאגרי מידע ואספנים' },
   { id: 'nadlan', name: 'נדל"ן — עסקאות (רשות המסים)' },
-  { id: 'govmap', name: 'GovMap — שכבות GIS' },
+  {
+    id: 'govmap', name: 'GovMap — שכבות GIS',
+    // GovMap's 2026 rebuild removed the anonymous full-geometry endpoints, so
+    // the extension currently saves centroid points only (no full polygons/
+    // lines) and big layers are slow/partial. OVER tracks many layers fully.
+    note: 'מגבלה נוכחית: ההורדה שומרת לרוב נקודות מרכז בלבד (ללא פוליגונים מלאים) ושכבות גדולות עלולות לצאת חלקיות — כדאי לבדוק אם השכבה זמינה במלואה באתר OVER',
+    noteLink: { href: 'https://www.over.org.il/', label: 'over.org.il ↗' },
+  },
   { id: 'mavat', name: 'מנהל התכנון (mavat)' },
   { id: 'idf', name: 'צה"ל' },
   { id: 'mot', name: 'חצב — משרד התחבורה' },
@@ -305,6 +312,20 @@ async function renderSites() {
     span.textContent = s.name;
     label.append(cb, span);
     wrap.appendChild(label);
+    if (s.note) {
+      const note = document.createElement('div');
+      note.className = 'tag site-note';
+      note.textContent = s.note + ' ';
+      if (s.noteLink) {
+        const a = document.createElement('a');
+        a.href = s.noteLink.href;
+        a.target = '_blank';
+        a.rel = 'noreferrer';
+        a.textContent = s.noteLink.label;
+        note.appendChild(a);
+      }
+      wrap.appendChild(note);
+    }
   }
 }
 

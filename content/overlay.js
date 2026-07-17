@@ -161,6 +161,22 @@
       formatGeojsonCb.checked = true;
       extentViewCb = el('input', { type: 'checkbox', class: 'gs-mavat-cb' });
       extentViewCb.checked = false;
+      // GovMap's 2026 rebuild killed both geometry paths (WFS + the per-feature
+      // entities-geometry backfill both serve the SPA HTML shell now), so the
+      // extension can only save each feature's centroid Point — no full
+      // polygons/lines — and big layers are slow/partial (100-row identify cap
+      // + 100k safety cap). Say so up front, and point at OVER, which tracks
+      // many govmap layers with full geometry.
+      const overLink = el('a', {
+        className: 'gs-govmap-over-link',
+        href: 'https://www.over.org.il/',
+        target: '_blank', rel: 'noreferrer',
+        title: 'גרסאות לעם — מעקב גרסאות והורדה מלאה של מאגרים ממשלתיים, כולל שכבות GovMap',
+      }, ['בדקו אם השכבה זמינה במלואה באתר OVER ↗']);
+      const govmapNote = el('div', { className: 'gs-govmap-note' }, [
+        el('span', {}, ['⚠ מגבלה נוכחית של GovMap: ההורדה שומרת לרוב נקודות מרכז בלבד (ללא פוליגונים/קווים מלאים), ושכבות גדולות עלולות לצאת איטיות או חלקיות. ']),
+        overLink,
+      ]);
       formatBox = el('div', { className: 'gs-format gs-format-col' }, [
         el('div', { className: 'gs-format-row' }, [
           el('span', { className: 'gs-format-label' }, ['פורמט:']),
@@ -169,7 +185,15 @@
         ]),
         el('label', { className: 'gs-format-opt gs-extent-opt', title: 'סורק רק את השטח הנראה כרגע במפה, לא את כל השכבה' },
           [extentViewCb, el('span', {}, ['הורד רק את תחום התצוגה (מה שרואים במסך)'])]),
+        govmapNote,
       ]);
+      // Deep-link the OVER note to a search for this layer's catalog name.
+      import(chrome.runtime.getURL('scrapers/govmap.js'))
+        .then(m => m.resolveLayerCaption?.(parsed.layerId))
+        .then(caption => {
+          if (caption) overLink.href = 'https://www.over.org.il/?q=' + encodeURIComponent(caption);
+        })
+        .catch(() => {});
     }
 
     // geo.mot (חצב): a dynamic box, populated by initMot after reading which
@@ -430,8 +454,14 @@
       const transferable = await packageResult(result, parsed, { withAttachments: null, formats });
       const resp = await chrome.runtime.sendMessage({ type: 'package-and-download', payload: transferable });
       if (!resp?.ok) throw new Error(resp?.error || 'ההורדה נכשלה');
+      // govmap: when full geometry wasn't available (entities-geometry serves
+      // the SPA shell since ~2026-07), tell the user how many rows carry only
+      // a centroid Point and point them at OVER for the full layer.
+      const centroidNote = result.centroidOnly > 0
+        ? `. שימו לב: עבור ${result.centroidOnly} רשומות נשמרה נקודת מרכז בלבד (ללא פוליגון/קו מלא) — בדקו אם השכבה זמינה במלואה ב-over.org.il`
+        : '';
       setStatus(ui.progress,
-        `${'ההורדה הושלמה'} — ${result.rows.length} שורות`,
+        `${'ההורדה הושלמה'} — ${result.rows.length} שורות${centroidNote}`,
         'done');
       await logHistory({ scraper, parsed, result, filename: resp.filename, mode: 'csv' });
     } catch (e) {

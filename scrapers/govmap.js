@@ -30,7 +30,22 @@ const CATALOG_URL = BASE + '/layers-catalog/catalog?lang=he';
 // a `centroid` point. GovMap's OWN frontend falls back to this per-feature
 // endpoint in exactly that case (decompiled from its live JS bundle). Mirrors
 // the Main scraper's entities_client.py fix (govil-scraper commit a9503f9).
+//
+// 2026-07-17 UPDATE: this endpoint is now ALSO dead to anonymous clients —
+// verified same-origin from a govmap page: HTTP 200 + text/html (the SPA
+// shell), never JSON. Net effect: every non-point feature degrades to its
+// centroid Point, so polygons/lines currently come out as points. The Main
+// scraper migrated to the spatial-analysis API (layer-data +
+// object-geojson-data — see govil-scraper spatial_client.py); porting that
+// here is the real fix. Until then geomEndpointDead (below) trips on the
+// first HTML response so heavy layers don't burn 3 requests + ~3s of retry
+// sleeps per feature, and the result carries a centroid-only count so the
+// overlay can tell the user and point them at over.org.il.
 const ENTITY_GEOMETRY_URL = BASE + '/user-layers/entities-geometry';
+// Circuit breaker for ENTITY_GEOMETRY_URL: once it serves the SPA HTML shell
+// instead of JSON it will keep doing so — skip it for the rest of the run.
+// Mirrors entities_client.py's _geom_endpoint_dead. Reset per fetch() run.
+let geomEndpointDead = false;
 const PAGE_CAP = 100;          // entitiesByPoint returns at most this many per call
 const MAX_DEPTH = 14;          // quad-tree recursion guard
 const MAX_FEATURES = 100000;   // safety cap per layer
@@ -72,6 +87,7 @@ export const govmapScraper = {
   },
 
   async fetch(parsed, { onProgress, extentMode, isCancelled } = {}) {
+    geomEndpointDead = false; // fresh run — re-probe the geometry endpoint once
     const cancelled = () => { try { return !!(isCancelled && isCancelled()); } catch { return false; } };
     const layerIds = Array.isArray(parsed.layerIds) && parsed.layerIds.length
       ? parsed.layerIds
@@ -177,9 +193,14 @@ export const govmapScraper = {
 
     const failures = perLayer.filter(l => l.error).map(l => `${l.caption || l.layerId}: ${l.error}`);
     const gated = perLayer.filter(l => l.needCredentials).map(l => l.caption || l.layerId);
+    const centroidOnly = perLayer.reduce(
+      (n, l) => n + (l.entities || []).filter(e => e.gsCentroidOnly).length, 0);
     const notes = [];
     if (failures.length) notes.push(`שכבות שנכשלו: ${failures.join(' | ')}`);
     if (gated.length) notes.push(`שכבות שעשויות לדרוש הרשאה: ${gated.join(', ')}`);
+    if (centroidOnly > 0) {
+      notes.push(`⚠ עבור ${centroidOnly} מתוך ${allRows.length} רשומות GovMap לא סיפק גאומטריה מלאה (פוליגון/קו) — נשמרה נקודת מרכז בלבד. ייתכן שהשכבה זמינה במלואה באתר OVER: https://www.over.org.il`);
+    }
     notes.push(wantView
       ? 'ההורדה כוללת רק את תחום התצוגה הנוכחי (extent) — לא את כל השכבה.'
       : 'ההורדה סורקת את כל השכבה דרך ה-API החדש של GovMap (entitiesByPoint) — שכבות גדולות עשויות לקחת זמן.');
@@ -197,6 +218,7 @@ export const govmapScraper = {
       perLayer: perLayer.map(({ layerId, caption, typeName, error }) => ({
         layerId, caption, typeName, error,
       })),
+      centroidOnly,
       warning: notes.length ? notes.join(' • ') : null,
     };
   },
@@ -251,6 +273,7 @@ async function queryEntities(layerId, cx, cy, tol) {
 // the server DISSOLVES them into a single merged geometry (verified live), so
 // this must be called once per feature. Returns null on failure.
 async function fetchGeometry(layerId, objectId, retries = 2) {
+  if (geomEndpointDead) return null;
   const body = { layerId: String(layerId), objectIds: [String(objectId)] };
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -261,6 +284,15 @@ async function fetchGeometry(layerId, objectId, retries = 2) {
         credentials: 'omit',
       }, 30000);
       if (!resp.ok) throw new Error(`entities-geometry HTTP ${resp.status}`);
+      const ctype = (resp.headers && typeof resp.headers.get === 'function' && resp.headers.get('content-type')) || '';
+      if (ctype && !ctype.includes('json')) {
+        // SPA HTML shell — the endpoint no longer serves geometry (observed
+        // 2026-07-17, same fate as the WFS). Trip the breaker so the rest of
+        // the sweep skips it instead of burning retries per feature.
+        geomEndpointDead = true;
+        console.warn(`[GovScraper] entities-geometry returned ${ctype} — falling back to centroids for the rest of this run.`);
+        return null;
+      }
       const json = await resp.json();
       return (json && typeof json === 'object' && json.type) ? json : null;
     } catch (e) {
@@ -293,6 +325,10 @@ async function ensureGeometry(layerId, entity) {
   const c = entity.centroid;
   if (Array.isArray(c) && c.length >= 2 && isFinite(c[0]) && isFinite(c[1])) {
     entity.geom = geomToWkt({ type: 'Point', coordinates: [Number(c[0]), Number(c[1])] });
+    // Only the centroid was available — surfaced to the user in the result
+    // notes (entityToParts copies just objectId+fields, so this never leaks
+    // into the CSV columns).
+    entity.gsCentroidOnly = true;
   }
 }
 
@@ -487,6 +523,14 @@ async function loadCatalog() {
   _catalogCache = byId;
   try { await chrome.storage.session.set({ 'govmap.catalog': byId }); } catch {}
   return byId;
+}
+
+// The layer's human-readable catalog caption (or '' when unresolvable).
+// Used by the overlay to deep-link the OVER limitations note to a search for
+// this specific layer (https://www.over.org.il/?q=<caption>).
+export async function resolveLayerCaption(layerId) {
+  const entry = await resolveLayerFromCatalog(String(layerId));
+  return entry?.caption || '';
 }
 
 async function resolveLayerFromCatalog(layerId) {
@@ -786,4 +830,5 @@ export const __test__ = {
   fetchGeometry,
   ensureGeometry,
   entityToParts,
+  _setGeomEndpointDead: (v) => { geomEndpointDead = !!v; },
 };

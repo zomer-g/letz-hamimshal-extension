@@ -135,6 +135,14 @@ h2 {
 }
 .row input { margin-top: 3px; }
 .row span { color: var(--gs-text); line-height: 1.4; }
+/* per-site limitation note (e.g. govmap centroid-only geometry) */
+.site-note {
+  margin: 0 24px 4px 0; /* indent under the checkbox (RTL) */
+  font-size: 11px;
+  line-height: 1.5;
+}
+.site-note a { color: var(--gs-primary); font-weight: 600; text-decoration: none; }
+.site-note a:hover { text-decoration: underline; }
 
 .text-input {
   width: 100%;
