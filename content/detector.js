@@ -93,9 +93,15 @@
     if (!msg || typeof msg.type !== 'string') return;
     if (msg.type === 'gs-popup-detect') {
       const m = registry.dispatchByUrl(location.href);
-      if (!m) { sendResponse({ detected: false }); return; }
+      // pageUrl on BOTH branches: the popup builds OVER's address-based lookup
+      // (over.org.il/direct/<url>) from it, and it needs that most exactly when
+      // nothing was detected. The extension has no "tabs" permission, so
+      // tab.url is not readable from the popup — the content script is the only
+      // source for the page address.
+      if (!m) { sendResponse({ detected: false, pageUrl: location.href }); return; }
       sendResponse({
         detected: true,
+        pageUrl: location.href,
         label: m.parsed.label || m.parsed.collectorName || 'מאגר',
         source: m.scraper.label || '',
         kind: m.parsed.kind,

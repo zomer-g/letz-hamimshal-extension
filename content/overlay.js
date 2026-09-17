@@ -153,7 +153,7 @@
     // govmap: choose which output formats to download (both by default), and
     // whether to sweep only the current map view (extent) instead of the whole layer.
     const isWfs = parsed.kind === 'wfs_layer';
-    let formatCsvCb = null, formatGeojsonCb = null, formatBox = null, extentViewCb = null;
+    let formatCsvCb = null, formatGeojsonCb = null, formatBox = null, extentViewCb = null, govmapWarn = null;
     if (isWfs) {
       formatCsvCb = el('input', { type: 'checkbox', class: 'gs-mavat-cb' });
       formatGeojsonCb = el('input', { type: 'checkbox', class: 'gs-mavat-cb' });
@@ -161,22 +161,6 @@
       formatGeojsonCb.checked = true;
       extentViewCb = el('input', { type: 'checkbox', class: 'gs-mavat-cb' });
       extentViewCb.checked = false;
-      // GovMap's 2026 rebuild killed both geometry paths (WFS + the per-feature
-      // entities-geometry backfill both serve the SPA HTML shell now), so the
-      // extension can only save each feature's centroid Point — no full
-      // polygons/lines — and big layers are slow/partial (100-row identify cap
-      // + 100k safety cap). Say so up front, and point at OVER, which tracks
-      // many govmap layers with full geometry.
-      const overLink = el('a', {
-        className: 'gs-govmap-over-link',
-        href: 'https://www.over.org.il/',
-        target: '_blank', rel: 'noreferrer',
-        title: 'גרסאות לעם — מעקב גרסאות והורדה מלאה של מאגרים ממשלתיים, כולל שכבות GovMap',
-      }, ['בדקו אם השכבה זמינה במלואה באתר OVER ↗']);
-      const govmapNote = el('div', { className: 'gs-govmap-note' }, [
-        el('span', {}, ['⚠ מגבלה נוכחית של GovMap: ההורדה שומרת לרוב נקודות מרכז בלבד (ללא פוליגונים/קווים מלאים), ושכבות גדולות עלולות לצאת איטיות או חלקיות. ']),
-        overLink,
-      ]);
       formatBox = el('div', { className: 'gs-format gs-format-col' }, [
         el('div', { className: 'gs-format-row' }, [
           el('span', { className: 'gs-format-label' }, ['פורמט:']),
@@ -185,15 +169,62 @@
         ]),
         el('label', { className: 'gs-format-opt gs-extent-opt', title: 'סורק רק את השטח הנראה כרגע במפה, לא את כל השכבה' },
           [extentViewCb, el('span', {}, ['הורד רק את תחום התצוגה (מה שרואים במסך)'])]),
-        govmapNote,
       ]);
-      // Deep-link the OVER note to a search for this layer's catalog name.
-      import(chrome.runtime.getURL('scrapers/govmap.js'))
-        .then(m => m.resolveLayerCaption?.(parsed.layerId))
-        .then(caption => {
-          if (caption) overLink.href = 'https://www.over.org.il/?q=' + encodeURIComponent(caption);
-        })
+      // GovMap's 2026 rebuild killed both geometry paths (WFS + the per-feature
+      // entities-geometry backfill both serve the SPA HTML shell now), so the
+      // extension can only save each feature's centroid Point — no full
+      // polygons/lines — and big layers are slow/partial (100-row identify cap
+      // + 100k safety cap). This is a real hole in what the download gives you,
+      // so it gets a full warning block ABOVE the options rather than a footnote
+      // under them — and it sends the user to OVER, which archives many govmap
+      // layers in full and can be asked to archive one it doesn't have.
+      govmapWarn = buildUnsupportedWarn({
+        title: 'שכבה זו אינה נתמכת במלואה',
+        lines: [
+          'GovMap חסם את הגישה החופשית לגאומטריה המלאה. ההורדה מכאן תשמור לכל רשומה נקודת מרכז בלבד — בלי פוליגונים ובלי קווים — ושכבות גדולות עלולות לצאת איטיות או חלקיות.',
+        ],
+        pageUrl: location.href,
+        ctaLabel: 'בדקו את השכבה ב"גרסאות לעם" ↗',
+      });
+      // Secondary route: if the address-based lookup misses, search OVER by the
+      // layer's catalog name.
+      Promise.all([
+        import(chrome.runtime.getURL('scrapers/govmap.js')).then(m => m.resolveLayerCaption?.(parsed.layerId)),
+        import(chrome.runtime.getURL('lib/over-link.js')),
+      ]).then(([caption, over]) => {
+        if (!caption) return;
+        govmapWarn.appendChild(el('a', {
+          className: 'gs-warn-alt',
+          href: over.overSearchUrl(caption),
+          target: '_blank', rel: 'noreferrer',
+        }, [`או חפשו לפי שם השכבה: "${caption}" ↗`]));
+      }).catch(() => {});
+    }
+
+    // A loud "we can't fully collect this" block: what's missing, then a CTA to
+    // OVER's address-based lookup (over.org.il/direct/<page url>) — which either
+    // opens the archived dataset or offers to archive it. The external-site
+    // disclosure is part of the block, never optional: OVER is a separate site,
+    // not the extension.
+    function buildUnsupportedWarn({ title, lines, pageUrl, ctaLabel }) {
+      const cta = el('a', {
+        className: 'gs-warn-cta',
+        href: 'https://www.over.org.il/', // upgraded to /direct/<url> below
+        target: '_blank', rel: 'noreferrer',
+        title: 'גרסאות לעם — מעקב גרסאות והורדה מלאה של מאגרים ממשלתיים',
+      }, [ctaLabel]);
+      import(chrome.runtime.getURL('lib/over-link.js'))
+        .then(over => { cta.href = over.overDirectUrl(pageUrl); })
         .catch(() => {});
+      return el('div', { className: 'gs-warn', role: 'alert' }, [
+        el('div', { className: 'gs-warn-title' }, ['⚠ ', title]),
+        ...lines.map(t => el('div', { className: 'gs-warn-body' }, [t])),
+        cta,
+        el('div', { className: 'gs-warn-ext' }, [
+          el('strong', {}, ['הקישור מוביל לאתר חיצוני']),
+          ' — over.org.il ("גרסאות לעם"), אתר עצמאי שאינו חלק מהתוסף. אם המאגר כבר מאורכב שם אפשר להוריד אותו במלואו; אם לא — אפשר לבקש שם שיאורכב.',
+        ]),
+      ]);
     }
 
     // geo.mot (חצב): a dynamic box, populated by initMot after reading which
@@ -277,6 +308,7 @@
       titleEl,
       metaEl,
       hint,
+      govmapWarn,
       mavatBox,
       formatBox,
       motBox,
@@ -2283,7 +2315,11 @@
   }
 
   function safeFile(s) {
-    return String(s || 'file').replace(/[\\\/:*?"<>|\r\n\t]+/g, '_').slice(0, 150) || 'file';
+    const clean = String(s || 'file').replace(/[\\\/:*?"<>|\r\n\t]+/g, '_');
+    if (clean.length <= 150) return clean || 'file';
+    // Truncate the stem, not the extension — "…long name.docx" must stay a .docx.
+    const ext = extOf(clean);
+    return clean.slice(0, 150 - ext.length) + ext;
   }
   function extOf(n) { const m = /\.[a-z0-9]{1,5}$/i.exec(String(n || '')); return m ? m[0].toLowerCase() : ''; }
   function stripExt(n) { const s = String(n || ''); const e = extOf(s); return e ? s.slice(0, -e.length) : s; }

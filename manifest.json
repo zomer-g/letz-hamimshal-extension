@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "0.3.67",
+  "version": "0.3.69",
   "description": "__MSG_extDescription__",
   "default_locale": "he",
   "icons": {
@@ -156,7 +156,8 @@
         "lib/zip.js",
         "lib/wkt.js",
         "lib/fetch-proxy.js",
-        "lib/over-org-client.js"
+        "lib/over-org-client.js",
+        "lib/over-link.js"
       ],
       "matches": [
         "https://www.gov.il/*",

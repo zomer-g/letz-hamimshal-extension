@@ -39,6 +39,55 @@ async function renderCounter() {
   banner.hidden = false;
 }
 
+// --- "not fully supported" warning -----------------------------------------
+// Per-scraper limitations that leave the download incomplete. Users who turned
+// the floating window off drive everything from this popup, so the warning has
+// to live HERE too — not only in the overlay.
+const SITE_LIMITS = {
+  govmap: {
+    title: 'שכבה זו אינה נתמכת במלואה',
+    body: 'GovMap חסם את הגישה החופשית לגאומטריה המלאה. ההורדה מכאן תשמור לכל רשומה נקודת מרכז בלבד — בלי פוליגונים ובלי קווים — ושכבות גדולות עלולות לצאת איטיות או חלקיות.',
+    cta: 'בדקו את השכבה ב"גרסאות לעם" ↗',
+  },
+};
+
+// A loud block: what's missing, then OVER's address-based lookup
+// (over.org.il/direct/<page url>) — which either opens the archived dataset or
+// offers to archive it. The external-site disclosure is never optional.
+async function buildLimitWarn({ title, body, cta, pageUrl }) {
+  const box = document.createElement('div');
+  box.className = 'limit-warn';
+  box.setAttribute('role', 'alert');
+
+  const t = document.createElement('div');
+  t.className = 'lw-title';
+  t.textContent = `⚠ ${title}`;
+
+  const b = document.createElement('div');
+  b.className = 'lw-body';
+  b.textContent = body;
+
+  const a = document.createElement('a');
+  a.className = 'lw-cta';
+  a.target = '_blank';
+  a.rel = 'noreferrer';
+  a.textContent = cta;
+  a.title = 'גרסאות לעם — מעקב גרסאות והורדה מלאה של מאגרים ממשלתיים';
+  try {
+    const over = await import('../lib/over-link.js');
+    a.href = over.overDirectUrl(pageUrl);
+  } catch { a.href = 'https://www.over.org.il/'; }
+
+  const ext = document.createElement('div');
+  ext.className = 'lw-ext';
+  const strong = document.createElement('strong');
+  strong.textContent = 'הקישור מוביל לאתר חיצוני';
+  ext.append(strong, ' — over.org.il ("גרסאות לעם"), אתר עצמאי שאינו חלק מהתוסף. אם המאגר כבר מאורכב שם אפשר להוריד אותו במלואו; אם לא — אפשר לבקש שם שיאורכב.');
+
+  box.append(t, b, a, ext);
+  return box;
+}
+
 // --- current page: download straight from the popup ------------------------
 async function initPageCard() {
   const status = document.getElementById('pcStatus');
@@ -51,7 +100,24 @@ async function initPageCard() {
   try { res = await chrome.tabs.sendMessage(tab.id, { type: 'gs-popup-detect' }); } catch {}
   if (!res || !res.detected) {
     card.classList.add('idle');
-    status.textContent = 'בדף זה אין מאגר שניתן להוריד. גלוש לאתר ממשלתי נתמך (gov.il, נדל"ן, GovMap, מנהל התכנון, צה"ל, חצב).';
+    card.replaceChildren();
+    const t = document.createElement('div');
+    t.className = 'pc-status';
+    t.textContent = 'בדף זה אין מאגר שהתוסף יודע להוריד. גלוש לאתר ממשלתי נתמך (gov.il, נדל"ן, GovMap, מנהל התכנון, צה"ל, חצב, עיריית ירושלים, הכנסת, רמ"י).';
+    card.appendChild(t);
+    // On a host with no content script there is no page URL to look up — the
+    // extension has no "tabs" permission, so tab.url is unreadable. Then the CTA
+    // is a plain link to OVER's home page, and says so rather than promising an
+    // address lookup it can't perform.
+    const byAddress = !!(res && res.pageUrl);
+    card.appendChild(await buildLimitWarn({
+      title: 'הדף הזה לא נתמך בתוסף',
+      body: byAddress
+        ? 'ייתכן שהמאגר שבכתובת הזו כבר מאורכב ב"גרסאות לעם" וזמין שם להורדה מלאה, כולל היסטוריית גרסאות.'
+        : 'ייתכן שהמאגר שאתם מחפשים כבר מאורכב ב"גרסאות לעם" וזמין שם להורדה מלאה, כולל היסטוריית גרסאות.',
+      cta: byAddress ? 'בדקו את הכתובת ב"גרסאות לעם" ↗' : 'חפשו את המאגר ב"גרסאות לעם" ↗',
+      pageUrl: res && res.pageUrl,
+    }));
     return;
   }
 
@@ -81,7 +147,12 @@ async function initPageCard() {
   });
   const hint = document.createElement('div'); hint.className = 'pc-hint';
   hint.textContent = res.oneClick ? 'ההורדה תתחיל בדף, גם אם החלון הצף מוסתר.' : 'ייפתח חלון בחירה בדף (קטגוריות / פורמט).';
-  card.append(t, m, btn, hint);
+  card.append(t, m);
+  // Warn BEFORE the download button when the site can't be collected in full —
+  // the point is to be seen before the click, not after it.
+  const limit = SITE_LIMITS[res.scraperId];
+  if (limit) card.appendChild(await buildLimitWarn({ ...limit, pageUrl: res.pageUrl }));
+  card.append(btn, hint);
 }
 
 // --- recent downloads ------------------------------------------------------
@@ -274,7 +345,7 @@ const SITES = [
     // GovMap's 2026 rebuild removed the anonymous full-geometry endpoints, so
     // the extension currently saves centroid points only (no full polygons/
     // lines) and big layers are slow/partial. OVER tracks many layers fully.
-    note: 'מגבלה נוכחית: ההורדה שומרת לרוב נקודות מרכז בלבד (ללא פוליגונים מלאים) ושכבות גדולות עלולות לצאת חלקיות — כדאי לבדוק אם השכבה זמינה במלואה באתר OVER',
+    note: '⚠ אינו נתמך במלואו: ההורדה שומרת נקודות מרכז בלבד (ללא פוליגונים/קווים) ושכבות גדולות עלולות לצאת חלקיות. כדאי לבדוק אם השכבה זמינה במלואה באתר החיצוני',
     noteLink: { href: 'https://www.over.org.il/', label: 'over.org.il ↗' },
   },
   { id: 'mavat', name: 'מנהל התכנון (mavat)' },

@@ -113,8 +113,9 @@ function extractDynamicConfig(pageHtml) {
       initText = decodeEntities(pageHtml.slice(idx, idx + 2000));
     }
   }
-  const config = { templateId: '', resultsApiUrl: '', xClientId: '', itemsPerPage: 20, pageTitle: extractPageTitle(pageHtml) };
+  const config = { templateId: '', resultsApiUrl: '', xClientId: '', itemsPerPage: 20, pageTitle: extractPageTitle(pageHtml), fields: [] };
   if (!initText) return config;
+  config.fields = extractDynamicFields(initText);
 
   const guids = [...initText.matchAll(RE_GUID_ALL)].map(m => m[1]);
   const urlMatch = initText.match(/'(https?:\/\/[^']+)'/);
@@ -126,6 +127,40 @@ function extractDynamicConfig(pageHtml) {
   const ippMatch = initText.match(/',\s*(\d+)\s*,/);
   if (ippMatch) config.itemsPerPage = parseInt(ippMatch[1], 10);
   return config;
+}
+
+// The ng-init call also carries the template's field schema — a JSON array of
+// { Type, Name, Label, MultiChoiseValues:{Values:[{Key,Value}]}, ResultsOrder }.
+// It turns list codes ("32") into their labels and names the CSV columns the
+// way the site shows them. Best-effort: [] when absent or unparsable.
+function extractDynamicFields(initText) {
+  const start = initText.search(/\[\s*\{\s*"Type"\s*:/);
+  if (start < 0) return [];
+  const end = matchingBracket(initText, start);
+  if (end < 0) return [];
+  try {
+    const arr = JSON.parse(initText.slice(start, end + 1));
+    return Array.isArray(arr) ? arr.filter(f => f && typeof f.Name === 'string' && f.Name) : [];
+  } catch {
+    return [];
+  }
+}
+
+function matchingBracket(s, openIdx) {
+  let depth = 0, inStr = false, esc = false;
+  for (let i = openIdx; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '[' || c === '{') depth++;
+    else if (c === ']' || c === '}') { if (--depth === 0) return i; }
+  }
+  return -1;
 }
 
 function decodeEntities(s) {
@@ -243,6 +278,7 @@ async function scrapeDynamic(parsed, { onProgress, pageSize, isCancelled }) {
     await sleep(total > 500 ? 500 : 200);
   }
 
+  if (config.fields.length) return buildDynamicSchemaResult(allItems, total, parsed, warning, config.fields);
   return buildTabularResult(allItems, total, parsed, warning);
 }
 
@@ -564,6 +600,117 @@ function buildTabularResult(items, total, parsed, warning) {
   };
 }
 
+// DynamicCollector with a parsed field schema: columns are the site's own
+// labels in its display order, list codes resolve to their text, dates are
+// Israel-local, rich text is plain, and every file field gets a names column
+// plus a download-link column (so the CSV alone is a complete index).
+function buildDynamicSchemaResult(items, total, parsed, warning, fields) {
+  const ordered = fields.slice().sort((a, b) => (a.ResultsOrder ?? 999) - (b.ResultsOrder ?? 999));
+  const usedLabels = new Set();
+  const cols = ordered.map(f => {
+    let label = String(f.Label || '').trim() || f.Name;
+    if (usedLabels.has(label)) label = `${label} (${f.Name})`;
+    usedLabels.add(label);
+    const values = new Map();
+    for (const v of f.MultiChoiseValues?.Values || []) {
+      if (v && v.Key != null) values.set(String(v.Key), String(v.Value ?? ''));
+    }
+    return { field: f, label, values };
+  });
+  const known = new Set(ordered.map(f => f.Name));
+  const fileLinkLabel = (label) => `${label} - קישור`;
+
+  const rows = items.map(item => {
+    const data = (item && item.Data && typeof item.Data === 'object') ? item.Data : {};
+    const urlName = item?.UrlName || '';
+    const row = {};
+    for (const { field, label, values } of cols) {
+      const v = data[field.Name];
+      if (field.Type === 3 || isFileLikeArray(v)) {
+        const files = Array.isArray(v) ? v.filter(e => e && typeof e === 'object') : [];
+        row[label] = files.map(e => String(e.DisplayName || e.FileName || '').trim()).filter(Boolean).join(' | ');
+        row[fileLinkLabel(label)] = files.map(e => fileEntryUrl(e, urlName)).filter(Boolean).join(' | ');
+      } else if (values.size) {
+        // Older items store the text itself (sometimes padded) or a "none"
+        // placeholder instead of a code — pass text through, drop placeholders.
+        const codes = Array.isArray(v) ? v : (v == null || v === '' ? [] : [v]);
+        row[label] = codes
+          .map(c => String(c ?? '').trim())
+          .filter(c => c && !NONE_PLACEHOLDERS.has(c))
+          .map(c => values.get(c) ?? c)
+          .join('; ');
+      } else if (field.Type === 2 && typeof v === 'string') {
+        row[label] = formatIsraelDate(v);
+      } else if (v && typeof v === 'object' && !Array.isArray(v) && ('DescriptionBlankTextString' in v || 'DescriptionHtmlString' in v)) {
+        row[label] = String(v.DescriptionBlankTextString || htmlToPlainText(String(v.DescriptionHtmlString || ''))).trim();
+      } else {
+        row[label] = simplifyValue(v);
+      }
+    }
+    // Data keys the schema doesn't describe — keep them rather than lose data.
+    for (const [k, v] of Object.entries(data)) {
+      if (known.has(k) || SKIP_KEYS.has(k.toLowerCase())) continue;
+      row[k] = isFileLikeArray(v)
+        ? v.map(e => fileEntryUrl(e, urlName)).filter(Boolean).join(' | ')
+        : simplifyValue(v);
+    }
+    if (item?.Description) row.Description = simplifyValue(item.Description);
+    row.UrlName = urlName;
+    return row;
+  });
+
+  const fieldsOut = [];
+  for (const { field, label } of cols) {
+    fieldsOut.push(label);
+    if (field.Type === 3) fieldsOut.push(fileLinkLabel(label));
+  }
+  const seen = new Set(fieldsOut);
+  for (const r of rows) for (const k of Object.keys(r)) if (!seen.has(k)) { seen.add(k); fieldsOut.push(k); }
+
+  return {
+    rows,
+    fields: fieldsOut,
+    sourceUrl: parsed.originalUrl,
+    collectorName: parsed.collectorName,
+    kind: parsed.kind,
+    total,
+    warning,
+    attachments: extractAttachmentsLite(items, parsed),
+  };
+}
+
+const NONE_PLACEHOLDERS = new Set(['_none', '- ללא -', 'ללא']);
+
+// "2026-08-24T21:00:00Z" → "2026-08-25" (the Israel calendar date the site
+// shows); keeps the time when it isn't local midnight. Unparsable → as-is.
+function formatIsraelDate(s) {
+  const d = new Date(s);
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(s) || Number.isNaN(d.getTime())) return s;
+  try {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(d).map(p => [p.type, p.value]));
+    const date = `${parts.year}-${parts.month}-${parts.day}`;
+    return parts.hour === '00' && parts.minute === '00' ? date : `${date} ${parts.hour}:${parts.minute}`;
+  } catch {
+    return s;
+  }
+}
+
+// A DynamicCollector file entry { FileName, Extension, DisplayName } → its
+// download URL. FileName is usually a bare name served from the item's blob
+// folder (/BlobFolder/dynamiccollectorresultitem/<UrlName>/he/<FileName>);
+// some APIs put a full URL there instead.
+function fileEntryUrl(entry, urlName) {
+  const fn = String(entry?.FileName || entry?.fileName || '').trim();
+  if (!fn) return '';
+  if (/^https?:\/\//i.test(fn)) return fn;
+  if (/^\/?BlobFolder\//i.test(fn)) return `${BASE_URL}/${fn.replace(/^\//, '')}`;
+  if (!urlName) return '';
+  return `${BASE_URL}/BlobFolder/dynamiccollectorresultitem/${encodeURIComponent(urlName)}/he/${encodeURIComponent(fn)}`;
+}
+
 const SKIP_KEYS = new Set(['$$hashkey', 'file', 'files', 'attachments', 'fileattachments', 'filedata', 'document']);
 
 function flattenItem(item) {
@@ -594,8 +741,13 @@ function flattenItem(item) {
     // DynamicCollector items wrap useful data under `Data`. Lift it to top level.
     if (key === 'Data' && value && typeof value === 'object' && !Array.isArray(value)) {
       for (const [k2, v2] of Object.entries(value)) {
+        if (isFileLikeArray(v2)) {
+          // Files are downloaded separately; the CSV keeps their links.
+          const urls = v2.map(e => fileEntryUrl(e, item.UrlName)).filter(Boolean);
+          if (urls.length) out[k2] = urls.join(' | ');
+          continue;
+        }
         if (SKIP_KEYS.has(k2.toLowerCase())) continue;
-        if (isFileLikeArray(v2)) continue;  // attachments handled separately
         out[k2] = simplifyValue(v2);
       }
       continue;
@@ -731,7 +883,32 @@ function extractAttachmentsLite(items, parsed) {
     for (const v of Object.values(node)) if (v && typeof v === 'object') visit(v, idx);
   };
 
-  for (let idx = 0; idx < items.length; idx++) visit(items[idx], idx);
+  // (3) DynamicCollector file fields holding a bare FileName — the URL is
+  //     derived from the item's UrlName. Named "<UrlName> - <file>" so each
+  //     file maps back to its CSV row.
+  const pushBareFiles = (item, idx) => {
+    const urlName = item?.UrlName;
+    const data = item?.Data;
+    if (!urlName || !data || typeof data !== 'object') return;
+    for (const v of Object.values(data)) {
+      if (!isFileLikeArray(v)) continue;
+      for (const e of v) {
+        const fn = String(e?.FileName || e?.fileName || '').trim();
+        if (!fn || /^https?:\/\//i.test(fn) || /^\/?BlobFolder\//i.test(fn)) continue; // handled by (1)/(2)
+        const url = fileEntryUrl(e, urlName);
+        if (!url) continue;
+        let name = fn;
+        const ext = String(e.Extension || '').replace(/^\./, '');
+        if (!/\.[a-z0-9]{1,5}$/i.test(name) && /^[a-z0-9]{1,5}$/i.test(ext)) name += `.${ext.toLowerCase()}`;
+        push(url, `${urlName} - ${name}`, idx);
+      }
+    }
+  };
+
+  for (let idx = 0; idx < items.length; idx++) {
+    pushBareFiles(items[idx], idx);
+    visit(items[idx], idx);
+  }
   return out;
 }
 
@@ -767,4 +944,7 @@ export const __test__ = {
   extractDynamicConfig,
   extractPageTitle,
   orderFields,
+  buildDynamicSchemaResult,
+  formatIsraelDate,
+  fileEntryUrl,
 };

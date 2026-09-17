@@ -11,6 +11,7 @@ import { test, run, assert, assertEqual } from './_assert.mjs';
 const {
   extractItems, extractTotal, flattenItem, simplifyValue, htmlToPlainText,
   extractAttachmentsLite, decodeEntities, extractDynamicConfig, extractPageTitle, orderFields,
+  buildDynamicSchemaResult, formatIsraelDate, fileEntryUrl,
 } = __test__;
 
 // --- extractItems / extractTotal --------------------------------------------
@@ -165,6 +166,106 @@ test('extractDynamicConfig: custom results API + x-client-id (2nd GUID)', () => 
   assertEqual(cfg.templateId, 'aaaaaaaa-1111-1111-1111-111111111111');
   assertEqual(cfg.resultsApiUrl, 'https://pub-justice.openapi.gov.il/api/foo');
   assertEqual(cfg.xClientId, 'bbbbbbbb-2222-2222-2222-222222222222');
+});
+
+// --- DynamicCollector with bare FileName + field schema ---------------------
+// Shape captured live from verdict_the_rabbinical_courts (2026-09): files are
+// { FileName:"<bare name>", Extension, DisplayName } under Data.file, served at
+// /BlobFolder/dynamiccollectorresultitem/<UrlName>/he/<FileName>.
+
+const RABBINICAL_ITEM = {
+  Data: {
+    list: ['32'], list2: ['5'], list_3: ['8'],
+    dayan: 'הרב שניאור פרדס',
+    date: '2026-08-24T21:00:00Z',
+    number: '00000001',
+    file: [{ FileName: 'הגדרת מזונות.docx', FileMime: 'x', FileSize: '97593', Extension: 'docx', DisplayName: 'מאמר הרב פרדס' }],
+    namepsak: 'מאמר: חיוב מזונות',
+    des: { DescriptionHtmlString: '<p>תקציר</p>', DescriptionBlankTextString: 'תקציר' },
+    avocat: 'לא רלוונטי',
+  },
+  Description: null,
+  UrlName: 'pasad019',
+};
+const RABBINICAL_FIELDS = [
+  { Type: 0, Name: 'list', Label: 'נושא', ResultsOrder: 3, MultiChoiseValues: { Values: [{ Key: '32', Value: 'מאמרים' }] } },
+  { Type: 0, Name: 'list2', Label: 'בית דין', ResultsOrder: 2, MultiChoiseValues: { Values: [{ Key: '5', Value: 'ירושלים' }] } },
+  { Type: 1, Name: 'dayan', Label: 'שם דיין', ResultsOrder: 5, MultiChoiseValues: null },
+  { Type: 2, Name: 'date', Label: 'מועד מתן פסק הדין', ResultsOrder: 6, MultiChoiseValues: null },
+  { Type: 1, Name: 'number', Label: 'מספר תיק', ResultsOrder: 7, MultiChoiseValues: null },
+  { Type: 3, Name: 'file', Label: 'קובץ פסק הדין', ResultsOrder: 8, MultiChoiseValues: null },
+  { Type: 5, Name: 'namepsak', Label: 'שם פסק דין', ResultsOrder: 1, MultiChoiseValues: null },
+  { Type: 4, Name: 'des', Label: 'תקציר', ResultsOrder: 9, MultiChoiseValues: null },
+  { Type: 1, Name: 'avocat', Label: 'שמות הפרקליטים והמייצגים', ResultsOrder: 10, MultiChoiseValues: null },
+  { Type: 6, Name: 'list_3', Label: 'תת נושא', ResultsOrder: 4, MultiChoiseValues: { Values: [{ Key: '8', Value: 'מזונות', ParentKey: '13' }] } },
+];
+const RABBINICAL_URL = 'https://www.gov.il/BlobFolder/dynamiccollectorresultitem/pasad019/he/'
+  + encodeURIComponent('הגדרת מזונות.docx');
+
+test('attachments: bare FileName → BlobFolder url from UrlName', () => {
+  const out = extractAttachmentsLite([RABBINICAL_ITEM], { kind: 'dynamic_collector' });
+  assertEqual(out.length, 1);
+  assertEqual(out[0].url, RABBINICAL_URL);
+  assertEqual(out[0].filename, 'pasad019 - הגדרת מזונות.docx');
+});
+
+test('attachments: bare FileName without extension gets a sane Extension appended', () => {
+  const item = { UrlName: 'x1', Data: { file: [{ FileName: 'psak', Extension: 'PDF' }] } };
+  assertEqual(extractAttachmentsLite([item], {})[0].filename, 'x1 - psak.pdf');
+});
+
+test('attachments: bare FileName without UrlName → skipped', () => {
+  assertEqual(extractAttachmentsLite([{ Data: { file: [{ FileName: 'a.docx' }] } }], {}).length, 0);
+});
+
+test('flattenItem: Data file array → link column (not dropped)', () => {
+  const out = flattenItem(RABBINICAL_ITEM);
+  assertEqual(out.file, RABBINICAL_URL);
+});
+
+test('fileEntryUrl: full URL passes through', () => {
+  assertEqual(fileEntryUrl({ FileName: 'https://x.gov.il/a' }, 'u'), 'https://x.gov.il/a');
+});
+
+test('formatIsraelDate: UTC evening → next Israel calendar day', () => {
+  assertEqual(formatIsraelDate('2026-08-24T21:00:00Z'), '2026-08-25');
+  assertEqual(formatIsraelDate('2026-01-10T08:30:00Z'), '2026-01-10 10:30');
+  assertEqual(formatIsraelDate('לא תאריך'), 'לא תאריך');
+});
+
+test('buildDynamicSchemaResult: labels, order, code→value, file names+links', () => {
+  const res = buildDynamicSchemaResult([RABBINICAL_ITEM], 1, { originalUrl: 'u', collectorName: 'c', kind: 'dynamic_collector' }, null, RABBINICAL_FIELDS);
+  assertEqual(res.fields.slice(0, 4), ['שם פסק דין', 'בית דין', 'נושא', 'תת נושא']);
+  assert(res.fields.indexOf('קובץ פסק הדין - קישור') === res.fields.indexOf('קובץ פסק הדין') + 1, 'link column follows file column');
+  const row = res.rows[0];
+  assertEqual(row['נושא'], 'מאמרים');
+  assertEqual(row['בית דין'], 'ירושלים');
+  assertEqual(row['תת נושא'], 'מזונות');
+  assertEqual(row['מועד מתן פסק הדין'], '2026-08-25');
+  assertEqual(row['תקציר'], 'תקציר');
+  assertEqual(row['קובץ פסק הדין'], 'מאמר הרב פרדס');
+  assertEqual(row['קובץ פסק הדין - קישור'], RABBINICAL_URL);
+  assertEqual(row.UrlName, 'pasad019');
+  assertEqual(res.attachments.length, 1);
+});
+
+test('buildDynamicSchemaResult: legacy text values pass through, placeholders dropped', () => {
+  const item = { UrlName: 'old1', Data: { list: [' גירושין ואכיפתם'], list2: ['_none'], list_3: ['- ללא -', '8'] } };
+  const row = buildDynamicSchemaResult([item], 1, {}, null, RABBINICAL_FIELDS).rows[0];
+  assertEqual(row['נושא'], 'גירושין ואכיפתם');
+  assertEqual(row['בית דין'], '');
+  assertEqual(row['תת נושא'], 'מזונות');
+  assertEqual(row['קובץ פסק הדין'], '');
+});
+
+test('extractDynamicConfig: field schema array parsed from ng-init', () => {
+  const init = `dynamicCtrl.Events.initCtrl({"listMultiChoiseValues":{"Values":[]}}, 0, '11111111-2222-3333-4444-555555555555','',10,'',[{"Type":0,"Name":"list","Label":"נושא [x]","MultiChoiseValues":{"Values":[{"Key":"1","Value":"א"}]}},{"Type":3,"Name":"file","Label":"קובץ"}],'MultiAutoComplete','99999999-2222-3333-4444-555555555555')`;
+  const html = `<div ng-init="${init.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"></div>`;
+  const cfg = extractDynamicConfig(html);
+  assertEqual(cfg.templateId, '11111111-2222-3333-4444-555555555555');
+  assertEqual(cfg.itemsPerPage, 10);
+  assertEqual(cfg.fields.map(f => f.Name), ['list', 'file']);
+  assertEqual(cfg.fields[0].Label, 'נושא [x]');
 });
 
 // --- orderFields ------------------------------------------------------------
